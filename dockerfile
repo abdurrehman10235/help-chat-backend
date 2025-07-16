@@ -20,7 +20,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY . .
 
 # Install PHP dependencies
-RUN composer install --optimize-autoloader --no-interaction --no-progress
+# Install PHP dependencies
+RUN composer install --optimize-autoloader --no-interaction --no-progress \
+    && composer dump-autoload
 
 # Laravel needs write permissions
 RUN chown -R www-data:www-data /var/www && chmod -R 755 /var/www
