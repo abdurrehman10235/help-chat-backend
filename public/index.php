@@ -11,7 +11,7 @@ if (file_exists($maintenance = $root.'/storage/framework/maintenance.php')) {
     require $maintenance;
 }
 
-require $root.'/vendor/autoload.php';
-$app = require_once $root.'/bootstrap/app.php';
+require __DIR__.'/../vendor/autoload.php';
+$app = require_once __DIR__.'/../bootstrap/app.php';
 
 $app->handleRequest(Request::capture());
