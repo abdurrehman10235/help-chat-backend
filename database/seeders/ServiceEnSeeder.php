@@ -9,7 +9,7 @@ class ServiceEnSeeder extends Seeder
 {
     public function run()
     {
-        DB::table('service_en')->insert([
+        DB::table('services_en')->insert([
             [
                 'slug' => 'room-service',
                 'name' => 'Room Service',

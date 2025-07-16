@@ -9,7 +9,7 @@ class ServiceArSeeder extends Seeder
 {
     public function run()
     {
-        DB::table('service_ar')->insert([
+        DB::table('services_ar')->insert([
             [
                 'slug' => 'room service',
                 'name' => 'خدمة الغرف',
