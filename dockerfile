@@ -32,4 +32,4 @@ RUN chown -R www-data:www-data /var/www && chmod -R 755 /var/www
 EXPOSE 8000
 
 # Start Laravel server
-CMD touch database.sqlite && php artisan migrate --force && php artisan db:seed && php artisan serve --host=0.0.0.0 --port=8000
+CMD touch database.sqlite && php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=8000
