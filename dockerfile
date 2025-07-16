@@ -1,42 +1,35 @@
-FROM php:8.3-fpm
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    curl \
-    sqlite3 \
-    git \
-    libzip-dev \
-    && docker-php-ext-install pdo pdo_mysql pdo_sqlite mbstring exif pcntl bcmath gd zip
-
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+FROM php:8.2-fpm
 
 # Set working directory
 WORKDIR /var/www
 
-# Copy project
+# Install system dependencies and PHP extensions
+RUN apt-get update && apt-get install -y \
+    libzip-dev \
+    unzip \
+    git \
+    curl \
+    sqlite3 \
+    libsqlite3-dev \
+    && docker-php-ext-install pdo pdo_sqlite zip
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy project files
 COPY . .
 
 # Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --optimize-autoloader --no-interaction --no-progress
 
-# Set file permissions
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www
+# Laravel needs write permissions
+RUN chown -R www-data:www-data /var/www && chmod -R 755 /var/www
 
-# Run Laravel commands
-RUN cp .env.example .env && php artisan key:generate
+# Generate .env and app key if needed
+# Optional: RUN cp .env.example .env && php artisan key:generate
 
 # Expose port
 EXPOSE 8000
 
 # Start Laravel server
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+CMD touch database.sqlite && php artisan migrate --force && php artisan db:seed && php artisan serve --host=0.0.0.0 --port=8000
