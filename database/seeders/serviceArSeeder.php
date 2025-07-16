@@ -47,4 +47,5 @@ class ServiceArSeeder extends Seeder
             ]
         ]);
     }
+    
 }
