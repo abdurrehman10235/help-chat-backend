@@ -1,4 +1,4 @@
-FROM php:8.2-fpm
+FROM php:8.2-cli
 
 # Set working directory
 WORKDIR /var/www
@@ -20,17 +20,14 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY . .
 
 # Install PHP dependencies
-# Install PHP dependencies
 RUN composer install --optimize-autoloader --no-interaction --no-progress \
     && composer dump-autoload
 
 # Laravel needs write permissions
 RUN chown -R www-data:www-data /var/www && chmod -R 755 /var/www
 
-# Generate .env and app key if needed
-# Optional: RUN cp .env.example .env && php artisan key:generate
-
-# Expose port
+# Expose Laravel's default dev port
 EXPOSE 8000
 
-CMD php artisan migrate --force && php artisan db:seed --force && php-fpm
+# Run migrations, seeder, then launch HTTP server
+CMD php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=8000
