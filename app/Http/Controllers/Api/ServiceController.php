@@ -43,72 +43,52 @@ class ServiceController extends Controller
 public function searchServiceByText(Request $request)
 {
     $lang = $request->query('lang', 'en');
-    $text = $request->input('text', '');
+    $text = $request->query('text');
+
+    if (!$text) {
+        return response()->json(['error' => 'No input'], 400);
+    }
+
     $table = $lang === 'ar' ? 'services_ar' : 'services_en';
-
-    $services = DB::table($table)->get();
-
     $normalize = function ($string) use ($lang) {
-        $string = strtolower(trim($string));
+        $string = trim($string);
+        $string = mb_strtolower($string);
         if ($lang === 'ar') {
-            // Remove Arabic diacritics
-            $string = preg_replace('/[\p{Mn}]/u', '', $string);
+            $string = preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}]/u', '', $string);
+        } else {
+            $string = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string);
+            $string = preg_replace('/[^a-z0-9\s]/', '', $string);
         }
-        return preg_replace('/[^\p{L}\p{N}]+/u', '', $string);
+        return $string;
     };
 
     $input = $normalize($text);
-
-    $suggestions = [];
+    $services = DB::table($table)->get();
     $bestMatch = null;
-    $bestScore = 0;
+    $highestScore = 0;
 
     foreach ($services as $service) {
         $name = $normalize($service->name);
-        $desc = $normalize($service->description ?? '');
+        $description = $normalize($service->description);
 
         similar_text($input, $name, $nameScore);
-        similar_text($input, $desc, $descScore);
+        similar_text($input, $description, $descScore);
 
         $score = max($nameScore, $descScore);
 
-        if ($score > 40) {
-            $suggestions[] = [
-                'id' => $service->id,
-                'name' => $service->name,
-                'description' => $service->description,
-                'image' => $service->image,
-                'score' => $score,
-            ];
-        }
-
-        if ($score > $bestScore) {
-            $bestScore = $score;
+        if ($score > $highestScore) {
+            $highestScore = $score;
             $bestMatch = $service;
         }
     }
 
-    // Sort suggestions by score
-    usort($suggestions, fn($a, $b) => $b['score'] <=> $a['score']);
-
-    if ($bestScore > 60) {
-        return response()->json([
-            'match' => $bestMatch,
-            'suggestions' => $suggestions,
-        ]);
-    } elseif (count($suggestions)) {
-        return response()->json([
-            'match' => null,
-            'suggestions' => $suggestions,
-        ]);
+    if ($bestMatch && $highestScore > 20) { // Tune this threshold if needed
+        return response()->json($bestMatch);
     } else {
-        return response()->json([
-            'match' => null,
-            'suggestions' => [],
-            'message' => 'No close match found.',
-        ], 404);
+        return response()->json(['message' => 'No close match found.'], 404);
     }
 }
+
     // List services without category grouping (simple list)
     public function list(Request $request)
     {
