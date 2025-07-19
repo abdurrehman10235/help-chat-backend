@@ -185,8 +185,7 @@ class ServiceController extends Controller
 
         return response()->json(['message' => 'Service created']);
     }
-
-    // Update existing service by slug (can update category_id too)
+    
     public function update(Request $request, $slug)
     {
         $lang = $request->query('lang', 'en');

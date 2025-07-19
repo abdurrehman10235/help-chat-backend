@@ -11,6 +11,14 @@ return new class extends Migration
      */
     public function up()
 {
+
+     Schema::create('service_categories', function (Blueprint $table) {
+    $table->id();
+    $table->string('slug')->unique(); // e.g. pre-arrival, arrival, etc.
+    $table->string('name_en');
+    $table->string('name_ar');
+    $table->timestamps();
+});
     Schema::create('services_en', function (Blueprint $table) {
     $table->id();
     $table->foreignId('category_id')->constrained('service_categories')->onDelete('cascade');
@@ -33,13 +41,7 @@ Schema::create('services_ar', function (Blueprint $table) {
     $table->timestamps();
 });
 
-    Schema::create('service_categories', function (Blueprint $table) {
-    $table->id();
-    $table->string('slug')->unique(); // e.g. pre-arrival, arrival, etc.
-    $table->string('name_en');
-    $table->string('name_ar');
-    $table->timestamps();
-});
+   
 }
 
     /**
