@@ -36,65 +36,79 @@ class ServiceController extends Controller
         return response()->json($result);
     }
 
-    // Search services by text in name or description
-    public function searchServiceByText(Request $request)
-    {
-        $lang = $request->query('lang', 'en');
-        $input = $request->query('text', '');
+    function stripArabicDiacritics($text) {
+    return preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}]/u', '', $text);
+}
 
-        $table = $lang === 'ar' ? 'services_ar' : 'services_en';
-        $categoryNameField = $lang === 'ar' ? 'name_ar' : 'name_en';
+public function searchServiceByText(Request $request)
+{
+    $lang = $request->query('lang', 'en');
+    $text = $request->input('text', '');
+    $table = $lang === 'ar' ? 'services_ar' : 'services_en';
 
-        // Normalize function for search, similar to before
-        $normalize = function ($string) use ($lang) {
-            $string = trim($string);
-            $string = mb_strtolower($string);
-            if ($lang !== 'ar') {
-                $string = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string);
-                $string = preg_replace('/[^a-z0-9\s]/', '', $string);
-            }
-            return $string;
-        };
+    $services = DB::table($table)->get();
 
-        $singularize = function ($word) use ($lang) {
-            if ($lang === 'ar') return $word;
-            if (str_ends_with($word, 'es')) return substr($word, 0, -2);
-            if (str_ends_with($word, 's')) return substr($word, 0, -1);
-            return $word;
-        };
+    $normalize = function ($string) use ($lang) {
+        $string = strtolower(trim($string));
+        if ($lang === 'ar') {
+            // Remove Arabic diacritics
+            $string = preg_replace('/[\p{Mn}]/u', '', $string);
+        }
+        return preg_replace('/[^\p{L}\p{N}]+/u', '', $string);
+    };
 
-        $input = $normalize($input);
-        $inputWords = array_filter(explode(' ', $input));
-        $inputWords = array_map($singularize, $inputWords);
+    $input = $normalize($text);
 
-        // Get all services with category info
-        $services = DB::table($table)
-            ->join('service_categories', "$table.category_id", '=', 'service_categories.id')
-            ->select(
-                "$table.slug",
-                "$table.name",
-                "$table.description",
-                "$table.price",
-                "$table.image_url",
-                "service_categories.slug as category_slug",
-                "service_categories.$categoryNameField as category_name"
-            )
-            ->get();
+    $suggestions = [];
+    $bestMatch = null;
+    $bestScore = 0;
 
-        foreach ($services as $service) {
-            $name = $normalize($service->name);
-            $desc = $normalize($service->description);
+    foreach ($services as $service) {
+        $name = $normalize($service->name);
+        $desc = $normalize($service->description ?? '');
 
-            foreach ($inputWords as $word) {
-                if (mb_strpos($name, $word) !== false || mb_strpos($desc, $word) !== false) {
-                    return response()->json($service);
-                }
-            }
+        similar_text($input, $name, $nameScore);
+        similar_text($input, $desc, $descScore);
+
+        $score = max($nameScore, $descScore);
+
+        if ($score > 40) {
+            $suggestions[] = [
+                'id' => $service->id,
+                'name' => $service->name,
+                'description' => $service->description,
+                'image' => $service->image,
+                'score' => $score,
+            ];
         }
 
-        return response()->json(['error' => 'No service matched'], 404);
+        if ($score > $bestScore) {
+            $bestScore = $score;
+            $bestMatch = $service;
+        }
     }
 
+    // Sort suggestions by score
+    usort($suggestions, fn($a, $b) => $b['score'] <=> $a['score']);
+
+    if ($bestScore > 60) {
+        return response()->json([
+            'match' => $bestMatch,
+            'suggestions' => $suggestions,
+        ]);
+    } elseif (count($suggestions)) {
+        return response()->json([
+            'match' => null,
+            'suggestions' => $suggestions,
+        ]);
+    } else {
+        return response()->json([
+            'match' => null,
+            'suggestions' => [],
+            'message' => 'No close match found.',
+        ], 404);
+    }
+}
     // List services without category grouping (simple list)
     public function list(Request $request)
     {
@@ -185,7 +199,7 @@ class ServiceController extends Controller
 
         return response()->json(['message' => 'Service created']);
     }
-    
+
     public function update(Request $request, $slug)
     {
         $lang = $request->query('lang', 'en');
