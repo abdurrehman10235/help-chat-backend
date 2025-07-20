@@ -57,7 +57,11 @@ public function searchServiceByText(Request $request)
             $string = preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}]/u', '', $string);
         } else {
             $string = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string);
+            // Replace hyphens with spaces BEFORE removing other punctuation
+            $string = str_replace('-', ' ', $string);
             $string = preg_replace('/[^a-z0-9\s]/', '', $string);
+            // Normalize multiple spaces to single space
+            $string = preg_replace('/\s+/', ' ', $string);
         }
         return $string;
     };
