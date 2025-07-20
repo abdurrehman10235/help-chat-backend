@@ -49,6 +49,8 @@ Schema::create('services_ar', function (Blueprint $table) {
      */
     public function down(): void
     {
-        Schema::dropIfExists('services_tables');
+        Schema::dropIfExists('services_ar');
+        Schema::dropIfExists('services_en');
+        Schema::dropIfExists('service_categories');
     }
 };

@@ -33,7 +33,7 @@ class UserController extends Controller
 }
 public function show($id)
     {
-        $user = DB::find($id);
+        $user = DB::table('users')->where('id', $id)->first();
 
         if (!$user) {
             return response()->json(['error' => 'User not found'], 404);

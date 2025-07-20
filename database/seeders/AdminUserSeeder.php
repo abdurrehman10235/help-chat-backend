@@ -10,7 +10,7 @@ class AdminUserSeeder extends Seeder
 {
     public function run()
     {
-        if (!User::where('email', 'admin@example.com')->exists()) {
+        if (!User::where('email', 'admin@admin.com')->exists()) {
             User::create([
                 'name' => 'Admin',
                 'email' => 'admin@admin.com',

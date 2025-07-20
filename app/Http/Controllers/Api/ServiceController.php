@@ -63,6 +63,7 @@ public function searchServiceByText(Request $request)
     };
 
     $input = $normalize($text);
+    $inputWords = explode(' ', $input);
     $services = DB::table($table)->get();
     $bestMatch = null;
     $highestScore = 0;
@@ -70,11 +71,43 @@ public function searchServiceByText(Request $request)
     foreach ($services as $service) {
         $name = $normalize($service->name);
         $description = $normalize($service->description);
+        $combinedText = $name . ' ' . $description;
+        
+        $score = 0;
 
+        // 1. Exact phrase matching (highest priority)
+        if (strpos($combinedText, $input) !== false) {
+            $score += 100;
+        }
+
+        // 2. Individual word matching in name (high priority)
+        $nameWords = explode(' ', $name);
+        foreach ($inputWords as $inputWord) {
+            if (strlen($inputWord) > 2) { // Skip very short words
+                foreach ($nameWords as $nameWord) {
+                    if (strpos($nameWord, $inputWord) !== false || strpos($inputWord, $nameWord) !== false) {
+                        $score += 50; // High score for name word matches
+                    }
+                }
+            }
+        }
+
+        // 3. Individual word matching in description (medium priority)
+        $descriptionWords = explode(' ', $description);
+        foreach ($inputWords as $inputWord) {
+            if (strlen($inputWord) > 2) { // Skip very short words like "i", "to", "a"
+                foreach ($descriptionWords as $descWord) {
+                    if (strpos($descWord, $inputWord) !== false || strpos($inputWord, $descWord) !== false) {
+                        $score += 25; // Medium score for description word matches
+                    }
+                }
+            }
+        }
+
+        // 4. Similarity scoring as fallback (lower priority)
         similar_text($input, $name, $nameScore);
         similar_text($input, $description, $descScore);
-
-        $score = max($nameScore, $descScore);
+        $score += ($nameScore * 1.5) + $descScore;
 
         if ($score > $highestScore) {
             $highestScore = $score;
@@ -82,7 +115,7 @@ public function searchServiceByText(Request $request)
         }
     }
 
-    if ($bestMatch && $highestScore > 20) { // Tune this threshold if needed
+    if ($bestMatch && $highestScore > 15) { // Lowered threshold for better matching
         return response()->json($bestMatch);
     } else {
         return response()->json(['message' => 'No close match found.'], 404);
