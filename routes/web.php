@@ -5,6 +5,11 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Response;
 use App\Http\Controllers\WhatsAppBotController;
 
+// Laravel welcome page
+Route::get('/', function () {
+    return view('welcome');
+});
+
 // Test route for debugging
 Route::get('/test', function () {
     try {

@@ -14,42 +14,7 @@ class WhatsAppBotController extends Controller
 
     public function showQRPage()
     {
-        try {
-            // Check if view file exists
-            if (!view()->exists('whatsapp-qr')) {
-                return response()->json([
-                    'error' => 'View file not found',
-                    'path' => resource_path('views/whatsapp-qr.blade.php'),
-                    'exists' => file_exists(resource_path('views/whatsapp-qr.blade.php'))
-                ], 500);
-            }
-
-            // Check storage permissions
-            if (!Storage::exists('')) {
-                try {
-                    Storage::put('test.txt', 'test');
-                    Storage::delete('test.txt');
-                } catch (\Exception $e) {
-                    return response()->json([
-                        'error' => 'Storage not writable',
-                        'message' => $e->getMessage()
-                    ], 500);
-                }
-            }
-
-            return view('whatsapp-qr');
-            
-        } catch (\Exception $e) {
-            Log::error('WhatsApp QR page error: ' . $e->getMessage());
-            Log::error('Error details: ' . $e->getTraceAsString());
-            
-            return response()->json([
-                'error' => 'Failed to load WhatsApp page',
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile()
-            ], 500);
-        }
+        return view('whatsapp-qr');
     }
 
     public function getStatus()
