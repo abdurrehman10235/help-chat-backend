@@ -123,7 +123,11 @@ EXPOSE 8000
 RUN echo '#!/bin/bash' > /var/www/start.sh && \
     echo 'cd /var/www' >> /var/www/start.sh && \
     echo 'echo "🔧 Setting up Laravel..."' >> /var/www/start.sh && \
-    echo 'cp .env.production .env' >> /var/www/start.sh && \
+    echo 'if [ -f .env.production ]; then cp .env.production .env; else cp .env.example .env; fi' >> /var/www/start.sh && \
+    echo 'sed -i "s|DB_DATABASE=.*|DB_DATABASE=/var/www/database/database.sqlite|g" .env' >> /var/www/start.sh && \
+    echo 'sed -i "s|APP_URL=.*|APP_URL=https://laravel-backend-r3ut.onrender.com|g" .env' >> /var/www/start.sh && \
+    echo 'sed -i "s|APP_ENV=.*|APP_ENV=production|g" .env' >> /var/www/start.sh && \
+    echo 'sed -i "s|APP_DEBUG=.*|APP_DEBUG=false|g" .env' >> /var/www/start.sh && \
     echo 'php artisan key:generate --force' >> /var/www/start.sh && \
     echo 'php artisan config:clear' >> /var/www/start.sh && \
     echo 'php artisan cache:clear' >> /var/www/start.sh && \
