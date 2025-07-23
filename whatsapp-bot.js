@@ -146,6 +146,19 @@ async function startBot() {
             qrTimeout = null;
         }
         
+        // Test API connection
+        try {
+            console.log('🔍 Testing API connection...');
+            const testResponse = await axios.get(`${BACKEND_URL}/services`, {
+                timeout: 5000,
+                headers: { 'Accept': 'application/json' }
+            });
+            console.log('✅ API connection test successful');
+        } catch (apiError) {
+            console.error('❌ API connection test failed:', apiError.message);
+            console.error('API URL:', `${BACKEND_URL}/services`);
+        }
+        
         await updateStatus('ready');
     });
 
@@ -282,13 +295,25 @@ async function startBot() {
             const hasArabicChars = /[\u0600-\u06FF]/.test(message.body);
             const searchLang = hasArabicChars ? 'ar' : 'en';
             
+            // Add API test for debugging
+            console.log('Searching for:', message.body, 'in language:', searchLang);
+            console.log('API URL:', `${BACKEND_URL}/service-from-text`);
+            
             // Search for services using detected language
             const response = await axios.get(`${BACKEND_URL}/service-from-text`, {
                 params: { 
                     text: message.body,
                     lang: searchLang 
+                },
+                timeout: 5000, // 5 second timeout
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
                 }
             });
+            
+            console.log('API Response status:', response.status);
+            console.log('API Response data type:', typeof response.data);
             
             const msgs = messages[userLang];
             
@@ -297,8 +322,11 @@ async function startBot() {
             if (response.data) {
                 if (Array.isArray(response.data)) {
                     services = response.data;
-                } else {
+                } else if (typeof response.data === 'object' && response.data.name) {
                     services = [response.data]; // Convert single object to array
+                } else {
+                    console.log('Unexpected response format:', response.data);
+                    throw new Error('Invalid response format from API');
                 }
             }
             
@@ -341,8 +369,32 @@ async function startBot() {
             
         } catch (error) {
             console.error('Message processing error:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                url: error.config?.url
+            });
+            
             const msgs = userLang ? messages[userLang] : messages.en;
-            await client.sendMessage(userId, msgs.error);
+            
+            // Send more specific error messages
+            let errorMessage = msgs.error;
+            if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+                errorMessage = userLang === 'ar' 
+                    ? "❌ مشكلة في الاتصال بالخادم. يرجى المحاولة مرة أخرى لاحقاً."
+                    : "❌ Server connection issue. Please try again later.";
+            } else if (error.response?.status === 500) {
+                errorMessage = userLang === 'ar'
+                    ? "❌ خطأ في الخادم. يرجى المحاولة مرة أخرى."
+                    : "❌ Server error. Please try again.";
+            } else if (error.message.includes('Unexpected token')) {
+                errorMessage = userLang === 'ar'
+                    ? "❌ خطأ في معالجة البيانات. يرجى المحاولة مرة أخرى."
+                    : "❌ Data processing error. Please try again.";
+            }
+            
+            await client.sendMessage(userId, errorMessage);
         }
     });
 

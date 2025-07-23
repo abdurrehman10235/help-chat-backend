@@ -135,11 +135,19 @@ Route::get('/web-whatsapp', function () {
     <script>
         async function refreshStatus() {
             try {
+                console.log('Fetching status...');
                 const response = await fetch("/api/whatsapp/status");
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                console.log('Status data:', data);
                 
                 let statusClass = "waiting";
-                let statusText = data.status;
+                let statusText = data.status || "No status available";
                 
                 // Handle different status types
                 if (data.status === "ready") {
@@ -163,10 +171,22 @@ Route::get('/web-whatsapp', function () {
                 } else if (data.status === "qr_ready") {
                     statusClass = "waiting";
                     statusText = "📱 QR Code Ready - Scan within 60 seconds!";
+                } else if (data.status === "initializing") {
+                    statusClass = "waiting";
+                    statusText = "🚀 Initializing WhatsApp Bot...";
+                } else if (data.status === "timeout") {
+                    statusClass = "error";
+                    statusText = "⏰ Connection Timeout - Restarting...";
+                } else if (data.status === "error") {
+                    statusClass = "error";
+                    statusText = `❌ Error: ${data.message || "Unknown error"}`;
+                } else if (data.status === "unknown") {
+                    statusClass = "waiting";
+                    statusText = "❓ Status Unknown - Starting up...";
                 }
                 
                 document.getElementById("status").innerHTML = 
-                    `<div class="status ${statusClass}"><strong>Status:</strong> ${statusText}<br><strong>Message:</strong> ${data.message || "N/A"}</div>`;
+                    `<div class="status ${statusClass}"><strong>Status:</strong> ${statusText}<br><strong>Message:</strong> ${data.message || "N/A"}<br><strong>Debug:</strong> Files exist: ${data.debug?.status_file_exists ? 'Yes' : 'No'}</div>`;
                 
                 if (data.qr && data.status === "qr_ready") {
                     document.getElementById("qr-container").innerHTML = 
@@ -180,7 +200,9 @@ Route::get('/web-whatsapp', function () {
                     document.getElementById("qr-container").innerHTML = "<p>Waiting for QR code...</p>";
                 }
             } catch (error) {
-                document.getElementById("status").innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+                console.error('Status fetch error:', error);
+                document.getElementById("status").innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+                document.getElementById("qr-container").innerHTML = "<p>❌ Unable to fetch status</p>";
             }
         }
         

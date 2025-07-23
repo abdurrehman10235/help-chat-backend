@@ -23,17 +23,29 @@ class WhatsAppBotController extends Controller
             $status = $this->getWhatsAppStatus();
             $qr = $this->getQRCode();
             
+            // Add debugging
+            Log::info('WhatsApp Status Debug', [
+                'status_file_exists' => Storage::exists($this->statusFile),
+                'qr_file_exists' => Storage::exists($this->qrFile),
+                'status_data' => $status,
+                'has_qr' => !is_null($qr)
+            ]);
+            
             return response()->json([
                 'status' => $status['status'] ?? 'unknown',
                 'message' => $status['message'] ?? null,
                 'qr' => $qr,
-                'timestamp' => now()->toISOString()
+                'timestamp' => now()->toISOString(),
+                'debug' => [
+                    'status_file_exists' => Storage::exists($this->statusFile),
+                    'qr_file_exists' => Storage::exists($this->qrFile)
+                ]
             ]);
         } catch (\Exception $e) {
             Log::error('WhatsApp status error: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',
-                'message' => 'Unable to retrieve status'
+                'message' => 'Unable to retrieve status: ' . $e->getMessage()
             ], 500);
         }
     }
