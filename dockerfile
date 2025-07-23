@@ -101,6 +101,11 @@ RUN echo '[supervisord]' > /etc/supervisor/conf.d/supervisord.conf && \
     echo 'user=root' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'stdout_logfile=/var/log/whatsapp.log' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'stderr_logfile=/var/log/whatsapp_error.log' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'startretries=5' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'startsecs=10' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stopwaitsecs=30' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'killasgroup=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stopasgroup=true' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'environment=NODE_ENV=production,BACKEND_URL=http://localhost:8000/api,PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true,PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable' >> /etc/supervisor/conf.d/supervisord.conf
 
 # Create necessary directories and set permissions

@@ -163,14 +163,42 @@ The bot logs all messages and errors to console. Watch for:
 5. **Analytics**: Track popular services
 
 ### Production Deployment:
-1. **Render Deployment**: See `RENDER-DEPLOYMENT.md` for complete guide
+1. **Render Deployment**: See `RENDER-DEPLOYMENT-GUIDE.md` for complete guide
    - Web-based QR code interface at `/whatsapp`
    - Automatic bot management and restarts
    - Session persistence across deployments
+   - Enhanced stability with heartbeat monitoring
+   - Improved supervisor configuration for cloud environments
 2. Use PM2 for other VPS deployments
 3. Set up webhook endpoints for better performance
 4. Add rate limiting and security measures
 5. Use WhatsApp Business API for official status
+
+## 🔍 Troubleshooting
+
+### Common Issues:
+1. **QR Code not showing**: Make sure terminal supports UTF-8
+2. **Backend connection failed**: Check if Laravel is running on port 8000
+3. **Search not working**: Verify your database is seeded with services
+4. **Images not sending**: Check if image URLs are accessible, bot will fallback to sending image URL as text
+5. **Prices showing wrong currency**: All prices are stored and displayed in Saudi Riyals (SAR)
+
+### Deployment Troubleshooting:
+- **Exit Status 0**: Bot completed initialization but may be exiting early
+  - Check for heartbeat messages in logs
+  - Verify Chrome dependencies are installed
+  - Monitor supervisor restart patterns
+- **Exit Status 1**: Critical error during startup
+  - Check Chrome installation with `test-chrome.sh`
+  - Verify all Node.js dependencies
+  - Check memory and CPU limits
+
+### Logs:
+The bot logs all messages and errors to console. Watch for:
+- ✅ Connection successful messages
+- ❌ API call errors  
+- 📱 Incoming message logs
+- 💓 Heartbeat status updates
 
 ## 📞 Support
 

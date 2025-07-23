@@ -13,16 +13,33 @@ console.log('🚀 Starting WhatsApp Bot for Render deployment...');
 console.log('📊 Environment: ', process.env.NODE_ENV);
 console.log('🔗 Backend URL:', BACKEND_URL);
 console.log('🌐 Web Backend URL:', WEB_BACKEND_URL);
+console.log('🕐 Start time:', new Date().toISOString());
+
+// Keep track of bot state
+let botState = {
+    status: 'starting',
+    startTime: new Date().toISOString(),
+    lastActivity: new Date().toISOString(),
+    messageCount: 0,
+    isReady: false
+};
 
 // Enhanced error handling
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit on unhandled rejection, just log it
 });
 
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    process.exit(1);
+    // Only exit on critical errors
+    if (error.code === 'EADDRINUSE' || error.code === 'EACCES') {
+        process.exit(1);
+    }
 });
+
+// Prevent process from exiting on idle
+process.stdin.resume();
 
 // Initialize WhatsApp client with enhanced cloud configuration
 const client = new Client({
@@ -146,6 +163,10 @@ client.on('ready', async () => {
     console.log('🔗 Connected to Laravel backend at:', BACKEND_URL);
     console.log('🌐 Web interface available at: ' + WEB_BACKEND_URL + '/whatsapp');
     
+    botState.status = 'ready';
+    botState.isReady = true;
+    botState.lastActivity = new Date().toISOString();
+    
     await updateStatus('connected', 'WhatsApp bot successfully connected');
 });
 
@@ -181,7 +202,11 @@ client.on('message', async (message) => {
         const userMessage = message.body.toLowerCase().trim();
         const userPhone = message.from.replace('@c.us', '');
         
-        console.log(`📱 Message from ${userPhone}: ${userMessage}`);
+        // Update bot state
+        botState.messageCount++;
+        botState.lastActivity = new Date().toISOString();
+        
+        console.log(`📱 Message ${botState.messageCount} from ${userPhone}: ${userMessage}`);
 
         // Handle different types of messages
         await handleUserMessage(message, userMessage, userPhone);
@@ -505,13 +530,54 @@ async function initializeBot(retries = 3) {
             
             await updateStatus('initializing', 'WhatsApp bot starting up...');
             
-            client.initialize();
-            
-            // Wait a bit to see if initialization succeeds
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            
-            console.log('✅ Bot initialization started successfully');
-            return;
+            // Add promise wrapper to prevent early exit
+            return new Promise((resolve, reject) => {
+                let initializationComplete = false;
+                
+                // Set up initialization timeout
+                const initTimeout = setTimeout(() => {
+                    if (!initializationComplete) {
+                        console.log('⏰ Initialization timeout, but continuing to run...');
+                        initializationComplete = true;
+                        resolve();
+                    }
+                }, 60000); // 60 second timeout
+                
+                // Handle successful initialization
+                client.once('ready', () => {
+                    if (!initializationComplete) {
+                        console.log('✅ Bot initialization completed successfully');
+                        clearTimeout(initTimeout);
+                        initializationComplete = true;
+                        resolve();
+                    }
+                });
+                
+                // Handle authentication
+                client.once('authenticated', () => {
+                    console.log('🔐 Bot authenticated successfully');
+                });
+                
+                // Handle QR code generation
+                client.once('qr', () => {
+                    console.log('📱 QR code generated, waiting for scan...');
+                });
+                
+                // Handle initialization errors
+                client.once('auth_failure', (error) => {
+                    if (!initializationComplete) {
+                        console.error('❌ Authentication failed:', error);
+                        clearTimeout(initTimeout);
+                        initializationComplete = true;
+                        reject(new Error('Authentication failed: ' + error));
+                    }
+                });
+                
+                // Start the client
+                client.initialize();
+                
+                console.log('⏳ Bot initialization started, waiting for connection...');
+            });
             
         } catch (error) {
             console.error(`❌ Failed to initialize bot (attempt ${i + 1}):`, error);
@@ -546,7 +612,33 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Start the bot
-initializeBot().catch(error => {
+initializeBot().then(() => {
+    console.log('🎉 Bot initialization process completed');
+    
+    // Keep the process alive with status updates
+    const keepAlive = setInterval(() => {
+        const uptime = Math.floor((Date.now() - new Date(botState.startTime)) / 1000);
+        console.log(`💓 Bot heartbeat - Status: ${botState.status}, Uptime: ${uptime}s, Messages: ${botState.messageCount}, Ready: ${botState.isReady}`);
+        
+        // Update last activity
+        botState.lastActivity = new Date().toISOString();
+    }, 300000); // Every 5 minutes
+    
+    // Also do shorter status checks
+    const statusCheck = setInterval(() => {
+        if (!botState.isReady) {
+            console.log('⏳ Bot still initializing...');
+        }
+    }, 30000); // Every 30 seconds
+    
+    // Cleanup intervals on exit
+    process.on('exit', () => {
+        clearInterval(keepAlive);
+        clearInterval(statusCheck);
+        console.log('🛑 Bot process exiting...');
+    });
+    
+}).catch(error => {
     console.error('❌ Fatal error during bot initialization:', error);
     process.exit(1);
 });
