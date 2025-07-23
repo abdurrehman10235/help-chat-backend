@@ -102,8 +102,8 @@ async function startBot() {
                 if (message.type === 'ptt' || message.type === 'audio') {
                     // Voice note received - provide helpful response
                     const voiceResponse = userLang === 'ar' 
-                        ? "🎤 استلمت رسالتك الصوتية!\n\nيرجى كتابة نص للبحث عن الخدمات مثل:\n• سبا\n• مطعم\n• نقل المطار\n• خدمة الغرف\n• تنظيف\n\n💡 اكتب RESET لتغيير اللغة"
-                        : "🎤 Voice message received!\n\nPlease type text to search for services like:\n• Spa\n• Restaurant\n• Airport transfer\n• Room service\n• Cleaning\n\n💡 Type RESET to change language";
+                        ? "🎤 استلمت رسالتك الصوتية!\n\nيرجى كتابة نص للبحث عن الخدمات مثل:\n• سبا\n• مطعم\n• نقل المطار\n• خدمة الغرف\n• تنظيف\n💡 اكتب RESET لتغيير اللغة"
+                        : "🎤 Voice message received!\n\nPlease type text to search for services like:\n• Spa\n• Restaurant\n• Airport transfer\n• Room service\n• Cleaning\n💡 Type RESET to change language";
                     
                     await client.sendMessage(userId, voiceResponse);
                 } else {
