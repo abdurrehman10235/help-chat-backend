@@ -122,8 +122,16 @@ EXPOSE 8000
 # Create startup script
 RUN echo '#!/bin/bash' > /var/www/start.sh && \
     echo 'cd /var/www' >> /var/www/start.sh && \
+    echo 'echo "🔧 Setting up Laravel..."' >> /var/www/start.sh && \
+    echo 'cp .env.production .env' >> /var/www/start.sh && \
+    echo 'php artisan key:generate --force' >> /var/www/start.sh && \
+    echo 'php artisan config:clear' >> /var/www/start.sh && \
+    echo 'php artisan cache:clear' >> /var/www/start.sh && \
+    echo 'php artisan view:clear' >> /var/www/start.sh && \
+    echo 'php artisan route:clear' >> /var/www/start.sh && \
     echo 'php artisan migrate --force' >> /var/www/start.sh && \
     echo 'php artisan db:seed --force' >> /var/www/start.sh && \
+    echo 'echo "✅ Laravel setup complete"' >> /var/www/start.sh && \
     echo 'echo "Starting services..."' >> /var/www/start.sh && \
     echo 'supervisord -c /etc/supervisor/conf.d/supervisord.conf' >> /var/www/start.sh && \
     chmod +x /var/www/start.sh
