@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: laravel-backend
+    env: docker
+    plan: free
+    dockerfilePath: ./dockerfile
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: DB_DATABASE
+        value: /data/database.sqlite
+      - key: BACKEND_URL
+        value: https://laravel-backend.onrender.com/api
+    disk:
+      name: sqlite-data
+      mountPath: /data
+      sizeGB: 1
