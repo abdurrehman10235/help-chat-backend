@@ -128,6 +128,11 @@ class WhatsAppBotController extends Controller
 
         $qrContent = Storage::get($this->qrFile);
         
+        // If it's a data URL, extract just the base64 part
+        if (strpos($qrContent, 'data:image/png;base64,') === 0) {
+            return substr($qrContent, 22); // Remove "data:image/png;base64," prefix
+        }
+        
         // If it's already base64, return it
         if (preg_match('/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', $qrContent)) {
             return $qrContent;
@@ -141,7 +146,8 @@ class WhatsAppBotController extends Controller
     {
         $request->validate([
             'status' => 'required|string',
-            'message' => 'nullable|string'
+            'message' => 'nullable|string',
+            'qr' => 'nullable|string'
         ]);
 
         $status = [
@@ -151,6 +157,11 @@ class WhatsAppBotController extends Controller
         ];
 
         Storage::put($this->statusFile, json_encode($status));
+
+        // If QR code is provided, save it separately
+        if ($request->qr) {
+            Storage::put($this->qrFile, $request->qr);
+        }
 
         return response()->json(['success' => true]);
     }
