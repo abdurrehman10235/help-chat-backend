@@ -31,13 +31,20 @@ const messages = {
     }
 };
 
-async function updateStatus(status, qr = null) {
+async function updateStatus(status, qr = null, extra = null) {
     try {
-        await axios.post(`${BACKEND_URL}/whatsapp/status`, {
+        const payload = {
             status,
             qr,
             timestamp: new Date().toISOString()
-        });
+        };
+        
+        if (extra) {
+            payload.message = extra.message || `${extra.percent}% loaded`;
+            payload.extra = extra;
+        }
+        
+        await axios.post(`${BACKEND_URL}/whatsapp/status`, payload);
         console.log('Status updated:', status);
     } catch (error) {
         console.log('Status update failed:', error.message);
@@ -56,7 +63,10 @@ async function startBot() {
     console.log('🚀 Starting WhatsApp Bot...');
     
     client = new Client({
-        authStrategy: new LocalAuth(),
+        authStrategy: new LocalAuth({
+            clientId: "whatsapp-bot-v2",
+            dataPath: "./whatsapp-session"
+        }),
         puppeteer: {
             headless: true,
             args: [
@@ -66,9 +76,27 @@ async function startBot() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
-            ]
-        }
+                '--disable-gpu',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
+            ],
+            timeout: 60000 // Increase timeout
+        },
+        qrMaxRetries: 3, // Allow multiple QR retries
+        authTimeoutMs: 60000, // 60 second auth timeout
+        takeoverOnConflict: true // Handle multiple sessions
+    });
+
+    // Handle authentication process
+    client.on('authenticated', async () => {
+        console.log('🔐 Authentication successful! Connecting...');
+        await updateStatus('authenticated');
+    });
+
+    client.on('loading_screen', async (percent, message) => {
+        console.log(`📱 Loading: ${percent}% - ${message}`);
+        await updateStatus('loading', null, { percent, message });
     });
 
     // Handle authentication failure
@@ -95,12 +123,12 @@ async function startBot() {
                 clearTimeout(qrTimeout);
             }
             
-            // Set timeout for QR code expiration (20 seconds)
+            // Set timeout for QR code expiration (60 seconds - longer timeout)
             qrTimeout = setTimeout(async () => {
-                console.log('⏰ QR Code expired, requesting new one...');
+                console.log('⏰ QR Code expired after 60 seconds, requesting new one...');
                 await updateStatus('qr_expired');
                 // The WhatsApp client will automatically generate a new QR
-            }, 20000);
+            }, 60000);
             
         } catch (error) {
             console.error('QR generation failed:', error);

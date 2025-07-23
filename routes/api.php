@@ -145,6 +145,12 @@ Route::get('/web-whatsapp', function () {
                 if (data.status === "ready") {
                     statusClass = "connected";
                     statusText = "✅ Connected and Ready!";
+                } else if (data.status === "authenticated") {
+                    statusClass = "waiting";
+                    statusText = "🔐 Authenticated! Connecting to WhatsApp...";
+                } else if (data.status === "loading") {
+                    statusClass = "waiting";
+                    statusText = `📱 Loading WhatsApp... ${data.extra?.percent || 0}%`;
                 } else if (data.status === "qr_expired") {
                     statusClass = "waiting";
                     statusText = "⏰ QR Code Expired - Generating new one...";
@@ -156,7 +162,7 @@ Route::get('/web-whatsapp', function () {
                     statusText = "❌ Disconnected - Reconnecting...";
                 } else if (data.status === "qr_ready") {
                     statusClass = "waiting";
-                    statusText = "📱 QR Code Ready - Scan within 20 seconds!";
+                    statusText = "📱 QR Code Ready - Scan within 60 seconds!";
                 }
                 
                 document.getElementById("status").innerHTML = 
@@ -164,7 +170,10 @@ Route::get('/web-whatsapp', function () {
                 
                 if (data.qr && data.status === "qr_ready") {
                     document.getElementById("qr-container").innerHTML = 
-                        `<h3>📱 Scan QR Code (expires in 20 seconds):</h3><img src="data:image/png;base64,${data.qr}" class="qr-code">`;
+                        `<h3>📱 Scan QR Code (expires in 60 seconds):</h3><img src="data:image/png;base64,${data.qr}" class="qr-code">
+                        <p style="color: #666; font-size: 14px;">✅ Take your time - you have 60 seconds to scan<br>📱 Open WhatsApp → Settings → Linked Devices → Link a Device</p>`;
+                } else if (data.status === "authenticated" || data.status === "loading") {
+                    document.getElementById("qr-container").innerHTML = "<p>🔐 QR Code scanned successfully! Connecting...</p>";
                 } else if (data.status === "ready") {
                     document.getElementById("qr-container").innerHTML = "<p>✅ Successfully connected to WhatsApp!</p>";
                 } else {
