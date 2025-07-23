@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y \
     libxtst6 libglib2.0-0 libnspr4 libdbus-1-3 libatk-bridge2.0-0 \
     libdrm2 libxkbcommon0 libatspi2.0-0 \
     php8.2-cli php8.2-zip php8.2-sqlite3 php8.2-pdo php8.2-mbstring \
-    php8.2-xml php8.2-curl sqlite3 unzip \
+    php8.2-xml php8.2-curl php8.2-bcmath php8.2-gd php8.2-intl \
+    php8.2-tokenizer php8.2-fileinfo sqlite3 unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
@@ -31,7 +32,10 @@ RUN composer install --optimize-autoloader --no-interaction \
     && npm install
 
 # Create directories
-RUN mkdir -p storage/app whatsapp-session && chmod -R 777 storage whatsapp-session
+RUN mkdir -p storage/app storage/framework/cache storage/framework/sessions storage/framework/views \
+    storage/logs bootstrap/cache whatsapp-session && \
+    chmod -R 777 storage whatsapp-session && \
+    chmod -R 775 bootstrap/cache
 
 EXPOSE 8000
 

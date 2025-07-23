@@ -13,9 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [
-            'whatsapp*',
-            'test',
-            'whatsapp-simple'
+            '*'  // Disable CSRF for all routes temporarily
+        ]);
+        $middleware->web(remove: [
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
