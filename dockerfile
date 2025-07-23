@@ -27,9 +27,11 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
 # Copy project files
 COPY . .
 
-# Install dependencies
+# Install dependencies and setup during build (not runtime)
 RUN composer install --optimize-autoloader --no-interaction \
-    && npm install
+    && npm install \
+    && cp .env.example .env \
+    && php artisan key:generate --force
 
 # Create directories
 RUN mkdir -p storage/app storage/framework/cache storage/framework/sessions storage/framework/views \
@@ -39,15 +41,12 @@ RUN mkdir -p storage/app storage/framework/cache storage/framework/sessions stor
 
 EXPOSE 8000
 
-# Startup script
+# Startup script (simplified - only run what changes between deployments)
 RUN echo '#!/bin/bash' > start.sh && \
     echo 'echo "Starting application..."' >> start.sh && \
     echo 'echo "PORT: ${PORT:-8000}"' >> start.sh && \
-    echo 'cp .env.example .env' >> start.sh && \
-    echo 'php artisan key:generate --force' >> start.sh && \
-    echo 'echo "Database setup..."' >> start.sh && \
-    echo 'php artisan migrate --force' >> start.sh && \
-    echo 'php artisan db:seed --force' >> start.sh && \
+    echo 'php artisan migrate --force || echo "Migration failed, continuing..."' >> start.sh && \
+    echo 'php artisan db:seed --force || echo "Seeding failed, continuing..."' >> start.sh && \
     echo 'echo "Starting WhatsApp bot in background..."' >> start.sh && \
     echo 'node whatsapp-bot.js &' >> start.sh && \
     echo 'echo "Starting Laravel server on port ${PORT:-8000}..."' >> start.sh && \

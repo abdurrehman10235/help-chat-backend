@@ -97,6 +97,21 @@ Route::get('/web-whatsapp', function () {
             margin: 20px 0;
             font-weight: bold;
         }
+        .status.waiting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
         .refresh-btn {
             background: #25D366;
             color: white;
@@ -122,23 +137,47 @@ Route::get('/web-whatsapp', function () {
             try {
                 const response = await fetch("/api/whatsapp/status");
                 const data = await response.json();
-                document.getElementById("status").innerHTML = 
-                    `<div class="status waiting"><strong>Status:</strong> ${data.status}<br><strong>Message:</strong> ${data.message || "N/A"}</div>`;
                 
-                if (data.qr) {
+                let statusClass = "waiting";
+                let statusText = data.status;
+                
+                // Handle different status types
+                if (data.status === "ready") {
+                    statusClass = "connected";
+                    statusText = "✅ Connected and Ready!";
+                } else if (data.status === "qr_expired") {
+                    statusClass = "waiting";
+                    statusText = "⏰ QR Code Expired - Generating new one...";
+                } else if (data.status === "auth_failed") {
+                    statusClass = "error";
+                    statusText = "❌ Authentication Failed - Restarting...";
+                } else if (data.status === "disconnected") {
+                    statusClass = "error";
+                    statusText = "❌ Disconnected - Reconnecting...";
+                } else if (data.status === "qr_ready") {
+                    statusClass = "waiting";
+                    statusText = "📱 QR Code Ready - Scan within 20 seconds!";
+                }
+                
+                document.getElementById("status").innerHTML = 
+                    `<div class="status ${statusClass}"><strong>Status:</strong> ${statusText}<br><strong>Message:</strong> ${data.message || "N/A"}</div>`;
+                
+                if (data.qr && data.status === "qr_ready") {
                     document.getElementById("qr-container").innerHTML = 
-                        `<h3>Scan QR Code:</h3><img src="data:image/png;base64,${data.qr}" class="qr-code">`;
+                        `<h3>📱 Scan QR Code (expires in 20 seconds):</h3><img src="data:image/png;base64,${data.qr}" class="qr-code">`;
+                } else if (data.status === "ready") {
+                    document.getElementById("qr-container").innerHTML = "<p>✅ Successfully connected to WhatsApp!</p>";
                 } else {
-                    document.getElementById("qr-container").innerHTML = "<p>No QR code available</p>";
+                    document.getElementById("qr-container").innerHTML = "<p>Waiting for QR code...</p>";
                 }
             } catch (error) {
                 document.getElementById("status").innerHTML = `<div class="status error">Error: ${error.message}</div>`;
             }
         }
         
-        // Auto-refresh every 5 seconds
+        // Auto-refresh every 3 seconds for better QR handling
         refreshStatus();
-        setInterval(refreshStatus, 5000);
+        setInterval(refreshStatus, 3000);
     </script>
 </body>
 </html>', 200, ['Content-Type' => 'text/html']);

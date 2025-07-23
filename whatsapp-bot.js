@@ -7,6 +7,8 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8001/api';
 let client;
 let isReady = false;
 let userLanguages = {}; // Store user language preferences
+let qrTimeout; // Track QR timeout
+let lastQRGenerated = null;
 
 const messages = {
     en: {
@@ -69,19 +71,53 @@ async function startBot() {
         }
     });
 
+    // Handle authentication failure
+    client.on('auth_failure', async (message) => {
+        console.log('❌ Authentication failed:', message);
+        await updateStatus('auth_failed');
+        
+        // Clear session and restart after 10 seconds
+        console.log('🔄 Clearing session and restarting...');
+        setTimeout(() => {
+            startBot().catch(console.error);
+        }, 10000);
+    });
+
     client.on('qr', async (qr) => {
         console.log('📱 QR Code received');
         try {
             const qrImage = await QRCode.toDataURL(qr);
             await updateStatus('qr_ready', qrImage);
+            lastQRGenerated = Date.now();
+            
+            // Clear existing timeout
+            if (qrTimeout) {
+                clearTimeout(qrTimeout);
+            }
+            
+            // Set timeout for QR code expiration (20 seconds)
+            qrTimeout = setTimeout(async () => {
+                console.log('⏰ QR Code expired, requesting new one...');
+                await updateStatus('qr_expired');
+                // The WhatsApp client will automatically generate a new QR
+            }, 20000);
+            
         } catch (error) {
             console.error('QR generation failed:', error);
+            await updateStatus('qr_error');
         }
     });
 
     client.on('ready', async () => {
         console.log('✅ WhatsApp bot is ready!');
         isReady = true;
+        
+        // Clear QR timeout since we're now connected
+        if (qrTimeout) {
+            clearTimeout(qrTimeout);
+            qrTimeout = null;
+        }
+        
         await updateStatus('ready');
     });
 
@@ -285,7 +321,20 @@ async function startBot() {
     client.on('disconnected', async () => {
         console.log('❌ WhatsApp bot disconnected');
         isReady = false;
+        
+        // Clear QR timeout
+        if (qrTimeout) {
+            clearTimeout(qrTimeout);
+            qrTimeout = null;
+        }
+        
         await updateStatus('disconnected');
+        
+        // Auto-restart after disconnection (after 5 seconds)
+        console.log('🔄 Restarting bot in 5 seconds...');
+        setTimeout(() => {
+            startBot().catch(console.error);
+        }, 5000);
     });
 
     await client.initialize();
