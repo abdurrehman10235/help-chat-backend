@@ -120,7 +120,7 @@ public function searchServiceByText(Request $request)
             'airport-pickup' => ['airport', 'pickup', 'pick', 'transport', 'transportation', 'transfer', 'ride', 'taxi', 'car', 'driver', 'arrival'],
             
             // Early Check-in
-            'early-checkin' => ['early', 'checkin', 'check', 'arrive', 'arrival', 'before', 'time'],
+            'early-checkin' => ['early', 'checkin', 'check-in', 'check in', 'arrive', 'arrival', 'before', 'time'],
             
             // Room Preferences
             'room-preferences' => ['room', 'preference', 'customize', 'request', 'special', 'needs'],
@@ -132,7 +132,7 @@ public function searchServiceByText(Request $request)
             'luggage-assistance' => ['luggage', 'baggage', 'bags', 'porter', 'help', 'carry', 'assistance'],
             
             // Express Check-in
-            'express-checkin' => ['express', 'fast', 'quick', 'priority', 'skip', 'line', 'checkin', 'check'],
+            'express-checkin' => ['express', 'fast', 'quick', 'priority', 'skip', 'line', 'checkin', 'check-in'],
             
             // Room Service
             'room-service' => ['room', 'service', 'food', 'dining', 'meal', 'eat', 'hungry', 'restaurant', 'menu', 'order', 'delivery'],
@@ -144,7 +144,7 @@ public function searchServiceByText(Request $request)
             'spa' => ['spa', 'massage', 'relax', 'wellness', 'therapy', 'treatment', 'facial', 'beauty'],
             
             // Late Checkout
-            'late-checkout' => ['late', 'checkout', 'check', 'extend', 'stay', 'longer', 'extra', 'time'],
+            'late-checkout' => ['late', 'checkout', 'check-out', 'check out', 'extend', 'stay', 'longer', 'extra', 'time'],
             
             // Baggage Hold
             'baggage-hold' => ['baggage', 'luggage', 'bags', 'hold', 'store', 'keep', 'safe', 'storage'],

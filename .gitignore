@@ -22,5 +22,16 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# WhatsApp Web.js files
 /.wwebjs_auth
 /.wwebjs_cache
+.wwebjs_auth/
+.wwebjs_cache/
+/whatsapp_qr.txt
+/whatsapp_status.json
+/whatsapp_restart.flag
+
+# Storage files
+/storage/app/whatsapp_*
+/storage/logs/whatsapp.log
