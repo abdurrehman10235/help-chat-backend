@@ -34,7 +34,7 @@ RUN composer install --optimize-autoloader --no-interaction \
 RUN echo '[supervisord]' > /etc/supervisor/conf.d/app.conf && \
     echo 'nodaemon=true' >> /etc/supervisor/conf.d/app.conf && \
     echo '[program:laravel]' >> /etc/supervisor/conf.d/app.conf && \
-    echo 'command=php artisan serve --host=0.0.0.0 --port=8000' >> /etc/supervisor/conf.d/app.conf && \
+    echo 'command=php artisan serve --host=0.0.0.0 --port=%(ENV_PORT)s' >> /etc/supervisor/conf.d/app.conf && \
     echo 'directory=/var/www' >> /etc/supervisor/conf.d/app.conf && \
     echo 'autostart=true' >> /etc/supervisor/conf.d/app.conf && \
     echo 'autorestart=true' >> /etc/supervisor/conf.d/app.conf && \
@@ -51,6 +51,7 @@ EXPOSE 8000
 
 # Startup script
 RUN echo '#!/bin/bash' > start.sh && \
+    echo 'export PORT=${PORT:-8000}' >> start.sh && \
     echo 'cp .env.example .env' >> start.sh && \
     echo 'php artisan key:generate --force' >> start.sh && \
     echo 'php artisan migrate --force' >> start.sh && \

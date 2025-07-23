@@ -17,3 +17,5 @@ services:
         value: database/database.sqlite
       - key: BACKEND_URL
         value: https://laravel-backend-zyy3.onrender.com/api
+      - key: APP_URL
+        value: https://laravel-backend-zyy3.onrender.com
