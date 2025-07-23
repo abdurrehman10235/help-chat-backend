@@ -87,10 +87,14 @@ public function searchServiceByText(Request $request)
         // 2. Individual word matching in name (high priority)
         $nameWords = explode(' ', $name);
         foreach ($inputWords as $inputWord) {
-            if (strlen($inputWord) > 2) { // Skip very short words
+            if (strlen($inputWord) > 3 && !in_array($inputWord, ['want', 'need', 'like', 'some', 'this', 'that', 'with', 'from', 'have'])) {
                 foreach ($nameWords as $nameWord) {
-                    if (strpos($nameWord, $inputWord) !== false || strpos($inputWord, $nameWord) !== false) {
-                        $score += 50; // High score for name word matches
+                    if ($inputWord === $nameWord) {
+                        $score += 100; // Exact word match in name
+                    } elseif (strpos($nameWord, $inputWord) !== false) {
+                        $score += 60; // Partial match in name
+                    } elseif (strpos($inputWord, $nameWord) !== false) {
+                        $score += 40; // Input contains name word
                     }
                 }
             }
@@ -99,10 +103,62 @@ public function searchServiceByText(Request $request)
         // 3. Individual word matching in description (medium priority)
         $descriptionWords = explode(' ', $description);
         foreach ($inputWords as $inputWord) {
-            if (strlen($inputWord) > 2) { // Skip very short words like "i", "to", "a"
+            if (strlen($inputWord) > 3 && !in_array($inputWord, ['want', 'need', 'like', 'some', 'this', 'that', 'with', 'from', 'have', 'service', 'available'])) {
                 foreach ($descriptionWords as $descWord) {
-                    if (strpos($descWord, $inputWord) !== false || strpos($inputWord, $descWord) !== false) {
-                        $score += 25; // Medium score for description word matches
+                    if ($inputWord === $descWord) {
+                        $score += 30; // Exact word match in description
+                    } elseif (strpos($descWord, $inputWord) !== false) {
+                        $score += 15; // Partial match in description
+                    }
+                }
+            }
+        }
+
+        // 4. Enhanced keyword matching for all services
+        $serviceKeywords = [
+            // Airport Pickup
+            'airport-pickup' => ['airport', 'pickup', 'pick', 'transport', 'transportation', 'transfer', 'ride', 'taxi', 'car', 'driver', 'arrival'],
+            
+            // Early Check-in
+            'early-checkin' => ['early', 'checkin', 'check', 'arrive', 'arrival', 'before', 'time'],
+            
+            // Room Preferences
+            'room-preferences' => ['room', 'preference', 'customize', 'request', 'special', 'needs'],
+            
+            // Welcome Drink
+            'welcome-drink' => ['welcome', 'drink', 'beverage', 'refreshment', 'juice', 'water', 'greeting'],
+            
+            // Luggage Assistance
+            'luggage-assistance' => ['luggage', 'baggage', 'bags', 'porter', 'help', 'carry', 'assistance'],
+            
+            // Express Check-in
+            'express-checkin' => ['express', 'fast', 'quick', 'priority', 'skip', 'line', 'checkin', 'check'],
+            
+            // Room Service
+            'room-service' => ['room', 'service', 'food', 'dining', 'meal', 'eat', 'hungry', 'restaurant', 'menu', 'order', 'delivery'],
+            
+            // Laundry
+            'laundry' => ['laundry', 'wash', 'clean', 'dry', 'cleaning', 'clothes', 'garments', 'ironing'],
+            
+            // Spa
+            'spa' => ['spa', 'massage', 'relax', 'wellness', 'therapy', 'treatment', 'facial', 'beauty'],
+            
+            // Late Checkout
+            'late-checkout' => ['late', 'checkout', 'check', 'extend', 'stay', 'longer', 'extra', 'time'],
+            
+            // Baggage Hold
+            'baggage-hold' => ['baggage', 'luggage', 'bags', 'hold', 'store', 'keep', 'safe', 'storage'],
+            
+            // Airport Drop-off
+            'airport-dropoff' => ['airport', 'dropoff', 'drop', 'transport', 'transportation', 'transfer', 'departure', 'leaving']
+        ];
+
+        foreach ($serviceKeywords as $serviceSlug => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (strpos($input, $keyword) !== false) {
+                    if (strpos($service->slug, $serviceSlug) !== false || 
+                        strpos($combinedText, str_replace('-', ' ', $serviceSlug)) !== false) {
+                        $score += 150; // Very high score for keyword matches
                     }
                 }
             }

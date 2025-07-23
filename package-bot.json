@@ -1,0 +1,21 @@
+{
+  "name": "whatsapp-hotel-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot for hotel services using Laravel backend",
+  "main": "whatsapp-bot.js",
+  "scripts": {
+    "start": "node whatsapp-bot.js",
+    "dev": "nodemon whatsapp-bot.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "keywords": ["whatsapp", "bot", "hotel", "laravel"],
+  "author": "Help Chat Bot",
+  "license": "MIT"
+}

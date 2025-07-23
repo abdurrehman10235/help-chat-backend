@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: laravel-backend
+    name: laravel-whatsapp-bot
     env: docker
-    plan: free
-    dockerfilePath: ./Dockerfile
+    plan: starter  # Free plan has limited resources, starter is better for WhatsApp bot
+    dockerfilePath: ./dockerfile
     envVars:
       - key: APP_ENV
         value: production
@@ -14,4 +14,13 @@ services:
       - key: DB_CONNECTION
         value: sqlite
       - key: DB_DATABASE
-        value: database.sqlite  # or just leave default
+        value: /var/www/database/database.sqlite
+      - key: NODE_ENV
+        value: production
+      - key: BACKEND_URL
+        # This will be automatically set to your Render service URL
+        sync: false
+    disk:
+      name: whatsapp-data
+      mountPath: /var/www/whatsapp-session
+      sizeGB: 1

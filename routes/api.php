@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\WhatsAppBotController;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Response;
 
@@ -42,3 +43,9 @@ Route::delete('/service/{slug}', [ServiceController::class, 'destroy']);
 
 // **NEW**: Endpoint to get service categories (with language support)
 Route::get('/service-categories', [ServiceController::class, 'getCategories']);
+
+// WhatsApp Bot API endpoints
+Route::get('/whatsapp/status', [WhatsAppBotController::class, 'getStatus']);
+Route::post('/whatsapp/restart', [WhatsAppBotController::class, 'restart']);
+Route::post('/whatsapp/status', [WhatsAppBotController::class, 'updateStatus']);
+Route::post('/whatsapp/qr', [WhatsAppBotController::class, 'updateQR']);
