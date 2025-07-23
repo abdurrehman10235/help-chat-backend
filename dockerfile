@@ -1,23 +1,71 @@
-FROM php:8.2-cli
+FROM node:18-slim
 
 # Set working directory
 WORKDIR /var/www
 
-# Install system dependencies and PHP extensions
+# Install system dependencies for Chrome/Chromium and PHP
 RUN apt-get update && apt-get install -y \
-    libzip-dev \
-    unzip \
-    git \
+    # Chrome dependencies
+    wget \
+    gnupg \
+    ca-certificates \
+    procps \
+    libxss1 \
+    libgconf-2-4 \
+    libxrandr2 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libatk1.0-0 \
+    libcairo-gobject2 \
+    libgtk-3-0 \
+    libgdk-pixbuf2.0-0 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrender1 \
+    libxtst6 \
+    libxss1 \
+    libglib2.0-0 \
+    libnss3 \
+    libnspr4 \
+    libdbus-1-3 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libatspi2.0-0 \
+    # PHP and other dependencies
     curl \
-    sqlite3 \
-    libsqlite3-dev \
+    software-properties-common \
     supervisor \
-    nodejs \
-    npm \
-    && docker-php-ext-install pdo pdo_sqlite zip
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PHP 8.2
+RUN curl -sSL https://packages.sury.org/php/README.txt | bash -x \
+    && apt-get update \
+    && apt-get install -y \
+    php8.2-cli \
+    php8.2-zip \
+    php8.2-sqlite3 \
+    php8.2-pdo \
+    php8.2-mbstring \
+    php8.2-xml \
+    php8.2-curl \
+    sqlite3 \
+    unzip \
+    git
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Install Google Chrome Stable
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
 COPY . .
@@ -29,43 +77,49 @@ RUN composer install --optimize-autoloader --no-interaction --no-progress \
 # Install Node.js dependencies
 RUN npm install
 
-# Create supervisor configuration
+# Create supervisor configuration with proper user
 RUN echo '[supervisord]' > /etc/supervisor/conf.d/supervisord.conf && \
     echo 'nodaemon=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'user=root' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'logfile=/var/log/supervisord.log' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'pidfile=/var/run/supervisord.pid' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo '[program:laravel]' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'command=php /var/www/artisan serve --host=0.0.0.0 --port=8000' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'directory=/var/www' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'user=root' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'stdout_logfile=/var/log/laravel.log' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'stderr_logfile=/var/log/laravel_error.log' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo '[program:whatsapp-bot]' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'command=node /var/www/whatsapp-bot-web.js' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'command=node /var/www/whatsapp-bot-render.js' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'directory=/var/www' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'user=root' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'stdout_logfile=/var/log/whatsapp.log' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'stderr_logfile=/var/log/whatsapp_error.log' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'environment=NODE_ENV=production,BACKEND_URL=http://localhost:8000/api' >> /etc/supervisor/conf.d/supervisord.conf
+    echo 'environment=NODE_ENV=production,BACKEND_URL=http://localhost:8000/api,PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true,PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable' >> /etc/supervisor/conf.d/supervisord.conf
 
-# Laravel needs write permissions
-RUN chown -R www-data:www-data /var/www && chmod -R 755 /var/www
-
-# Create storage directories for WhatsApp session and status
+# Create necessary directories and set permissions
 RUN mkdir -p /var/www/whatsapp-session && \
     mkdir -p /var/www/storage/app && \
-    chown -R www-data:www-data /var/www/whatsapp-session && \
-    chown -R www-data:www-data /var/www/storage
+    mkdir -p /var/log && \
+    chmod -R 755 /var/www && \
+    chmod -R 777 /var/www/whatsapp-session && \
+    chmod -R 777 /var/www/storage
 
 # Expose Laravel's default dev port
 EXPOSE 8000
 
 # Create startup script
 RUN echo '#!/bin/bash' > /var/www/start.sh && \
+    echo 'cd /var/www' >> /var/www/start.sh && \
     echo 'php artisan migrate --force' >> /var/www/start.sh && \
     echo 'php artisan db:seed --force' >> /var/www/start.sh && \
+    echo 'echo "Starting services..."' >> /var/www/start.sh && \
     echo 'supervisord -c /etc/supervisor/conf.d/supervisord.conf' >> /var/www/start.sh && \
     chmod +x /var/www/start.sh
 
