@@ -35,9 +35,11 @@ RUN composer install --optimize-autoloader --no-interaction \
 
 # Create directories
 RUN mkdir -p storage/app storage/framework/cache storage/framework/sessions storage/framework/views \
-    storage/logs bootstrap/cache whatsapp-session && \
-    chmod -R 777 storage whatsapp-session && \
-    chmod -R 775 bootstrap/cache
+    storage/logs bootstrap/cache whatsapp-session database && \
+    chmod -R 777 storage whatsapp-session database && \
+    chmod -R 775 bootstrap/cache && \
+    touch database/database.sqlite && \
+    chmod 666 database/database.sqlite
 
 EXPOSE 8000
 
@@ -45,10 +47,15 @@ EXPOSE 8000
 RUN echo '#!/bin/bash' > start.sh && \
     echo 'echo "Starting WhatsApp Business API application..."' >> start.sh && \
     echo 'echo "PORT: ${PORT:-8000}"' >> start.sh && \
+    echo 'echo "Creating SQLite database..."' >> start.sh && \
+    echo 'touch /var/www/database/database.sqlite' >> start.sh && \
+    echo 'chmod 666 /var/www/database/database.sqlite' >> start.sh && \
     echo 'php artisan route:clear || echo "Route clear failed, continuing..."' >> start.sh && \
     echo 'php artisan config:clear || echo "Config clear failed, continuing..."' >> start.sh && \
     echo 'php artisan cache:clear || echo "Cache clear failed, continuing..."' >> start.sh && \
+    echo 'echo "Running migrations..."' >> start.sh && \
     echo 'php artisan migrate --force || echo "Migration failed, continuing..."' >> start.sh && \
+    echo 'echo "Running seeders..."' >> start.sh && \
     echo 'php artisan db:seed --force || echo "Seeding failed, continuing..."' >> start.sh && \
     echo 'echo "Starting Laravel server on port ${PORT:-8000}..."' >> start.sh && \
     echo 'php artisan serve --host=0.0.0.0 --port=${PORT:-8000}' >> start.sh && \

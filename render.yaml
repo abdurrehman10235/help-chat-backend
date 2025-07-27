@@ -14,7 +14,13 @@ services:
       - key: DB_CONNECTION
         value: sqlite
       - key: DB_DATABASE
-        value: database/database.sqlite
+        value: /var/www/database/database.sqlite
+      - key: CACHE_STORE
+        value: file
+      - key: SESSION_DRIVER
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
       - key: BACKEND_URL
         value: https://laravel-backend-zyy3.onrender.com/api
       - key: APP_URL
