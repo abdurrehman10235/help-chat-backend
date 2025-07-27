@@ -6,34 +6,31 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Api\ServiceController;
 
 class WhatsAppWebhookController extends Controller
 {
     private $messages = [
         'en' => [
-            'welcome' => "👋 Welcome to Hotel Service Assistant!\n\n🌍 Language / اللغة:\n• Type 'EN' for English\n• اكتب 'AR' للعربية\n\n🎤 You can also send voice messages!\n\nOr just tell me what service you need!",
-            'langSet' => "✅ Language set to English!\n\nNow tell me what service you're looking for:\n• 🧴 Spa services\n• 🛎️ Room service\n• 🚗 Airport pickup\n• 🍽️ Restaurant\n• 👔 Laundry\n\n🎤 Voice messages are supported!",
+            'welcome' => "👋 Welcome to Hotel Service Assistant!\n\n🏨 **Service Categories:**\n\n🚗 **Pre-Arrival** - Airport pickup, Early check-in, Room preferences\n📍 **Arrival** - Welcome drink, Luggage assistance, Express check-in\n🛎️ **In-Stay** - Room service, Laundry, Spa services\n✈️ **Departure** - Late checkout, Baggage hold, Airport drop-off\n\n💡 **Quick Tips:**\n• Choose a category or ask for a specific service\n• Type 'services' to see all services\n• Voice messages supported 🎤\n\nWhat can I help you with today?",
+            'categories' => "🏨 **Service Categories:**\n\n🚗 **Pre-Arrival** - Services before you arrive\n📍 **Arrival** - Services when you check-in\n🛎️ **In-Stay** - Services during your stay\n✈️ **Departure** - Services when you leave\n\n💡 Choose a category or ask for a specific service!",
             'found' => "✨ Here's what I found:",
             'price' => "Price",
-            'noResults' => "😔 Sorry, I couldn't find services matching your request.\n\nTry keywords like:\n• Room service\n• Spa\n• Restaurant\n• Transportation\n• Cleaning\n\n🎤 You can also send a voice message!",
-            'error' => "❌ Sorry, something went wrong. Please try again.",
-            'reset' => "🔄 Settings reset! Please choose your language:\n• Type 'EN' for English\n• اكتب 'AR' للعربية",
-            'voiceReceived' => "🎤 Voice message received!\n\nI understand voice messages, but I can only respond with text. Please send your request as text or voice - both work the same way!\n\nExample: \"I need spa services\" or just say it in a voice note.",
-            'voiceProcessing' => "🎤 Processing your voice message...",
-            'voiceError' => "❌ Sorry, I couldn't process your voice message. Please try sending it as text instead."
+            'noResults' => "😔 Sorry, I couldn't find that service.\n\n💡 **Try:**\n• Room service, Spa, Airport pickup\n• Or type 'categories' to browse all services\n• Voice messages work too! 🎤",
+            'error' => "❌ Sorry, something went wrong. Please try again or type 'categories' to start over.",
+            'suggestion' => "🤔 Did you mean",
+            'voiceReceived' => "🎤 Voice message received! I can understand voice messages.\n\n💡 Just speak naturally - I'll help you find the right service!",
         ],
         'ar' => [
-            'welcome' => "👋 أهلاً وسهلاً بك في مساعد خدمات الفندق!\n\n🌍 Language / اللغة:\n• Type 'EN' for English\n• اكتب 'AR' للعربية\n\n🎤 يمكنك أيضاً إرسال رسائل صوتية!\n\nأو أخبرني فقط بالخدمة التي تحتاجها!",
-            'langSet' => "✅ تم تعيين اللغة للعربية!\n\nالآن أخبرني بالخدمة التي تبحث عنها:\n• 🧴 خدمات السبا\n• 🛎️ خدمة الغرف\n• 🚗 نقل المطار\n• 🍽️ المطعم\n• 👔 الغسيل\n\n🎤 الرسائل الصوتية مدعومة!",
+            'welcome' => "👋 أهلاً وسهلاً بك في مساعد خدمات الفندق!\n\n🏨 **فئات الخدمات:**\n\n🚗 **قبل الوصول** - نقل المطار، تسجيل دخول مبكر، تفضيلات الغرفة\n📍 **الوصول** - مشروب ترحيب، مساعدة الأمتعة، تسجيل دخول سريع\n🛎️ **أثناء الإقامة** - خدمة الغرف، الغسيل، خدمات السبا\n✈️ **المغادرة** - تسجيل خروج متأخر، حفظ الأمتعة، توصيل المطار\n\n💡 **نصائح سريعة:**\n• اختر فئة أو اسأل عن خدمة معينة\n• اكتب 'خدمات' لرؤية جميع الخدمات\n• الرسائل الصوتية مدعومة 🎤\n\nكيف يمكنني مساعدتك اليوم؟",
+            'categories' => "🏨 **فئات الخدمات:**\n\n🚗 **قبل الوصول** - خدمات قبل وصولك\n📍 **الوصول** - خدمات عند تسجيل الدخول\n🛎️ **أثناء الإقامة** - خدمات أثناء إقامتك\n✈️ **المغادرة** - خدمات عند المغادرة\n\n💡 اختر فئة أو اسأل عن خدمة معينة!",
             'found' => "✨ إليك ما وجدته:",
             'price' => "السعر",
-            'noResults' => "😔 عذراً، لم أجد خدمات تطابق طلبك.\n\nجرب كلمات مثل:\n• خدمة الغرف\n• سبا\n• مطعم\n• نقل\n• تنظيف\n\n🎤 يمكنك أيضاً إرسال رسالة صوتية!",
-            'error' => "❌ عذراً، حدث خطأ. يرجى المحاولة مرة أخرى.",
-            'reset' => "🔄 تم إعادة تعيين الإعدادات! يرجى اختيار لغتك:\n• Type 'EN' for English\n• اكتب 'AR' للعربية",
-            'voiceReceived' => "🎤 تم استلام الرسالة الصوتية!\n\nأفهم الرسائل الصوتية، لكنني أستطيع الرد بالنص فقط. أرسل طلبك كنص أو صوت - كلاهما يعمل بنفس الطريقة!\n\nمثال: \"أريد خدمات السبا\" أو قلها في رسالة صوتية.",
-            'voiceProcessing' => "🎤 معالجة رسالتك الصوتية...",
-            'voiceError' => "❌ عذراً، لم أستطع معالجة رسالتك الصوتية. يرجى إرسالها كنص بدلاً من ذلك."
+            'noResults' => "😔 عذراً، لم أجد هذه الخدمة.\n\n💡 **جرب:**\n• خدمة الغرف، سبا، نقل المطار\n• أو اكتب 'فئات' لتصفح جميع الخدمات\n• الرسائل الصوتية تعمل أيضاً! 🎤",
+            'error' => "❌ عذراً، حدث خطأ. يرجى المحاولة مرة أخرى أو اكتب 'فئات' للبدء من جديد.",
+            'suggestion' => "🤔 هل تقصد",
+            'voiceReceived' => "🎤 تم استلام الرسالة الصوتية! يمكنني فهم الرسائل الصوتية.\n\n💡 تحدث بشكل طبيعي - سأساعدك في العثور على الخدمة المناسبة!",
         ]
     ];
 
@@ -181,52 +178,44 @@ class WhatsAppWebhookController extends Controller
     {
         $userText = trim($text);
         $upperText = strtoupper($userText);
+        $lowerText = strtolower($userText);
+        
+        // Auto-detect language from input text
+        $hasArabicChars = preg_match('/[\x{0600}-\x{06FF}]/u', $userText);
+        $detectedLang = $hasArabicChars ? 'ar' : 'en';
+        
+        // Set user language if not set or if language preference changes
+        if (!$userLang || $userLang !== $detectedLang) {
+            $userLang = $detectedLang;
+            $this->setUserLanguage($from, $userLang);
+        }
         
         Log::info('Text message received', [
             'from' => $from,
             'text' => $userText,
-            'language' => $userLang
+            'detected_language' => $detectedLang,
+            'user_language' => $userLang
         ]);
 
-        // Handle language selection
-        if ($upperText === 'EN') {
-            $this->setUserLanguage($from, 'en');
-            $this->sendMessage($from, $this->messages['en']['langSet']);
+        // Handle navigation keywords first
+        if ($this->isNavigationKeyword($lowerText, $userLang)) {
+            $this->handleNavigation($from, $lowerText, $userLang);
             return;
         }
         
-        if ($upperText === 'AR') {
-            $this->setUserLanguage($from, 'ar');
-            $this->sendMessage($from, $this->messages['ar']['langSet']);
+        // Handle category requests
+        if ($this->isCategoryRequest($lowerText, $userLang)) {
+            $this->handleCategoryRequest($from, $lowerText, $userLang);
             return;
         }
         
-        // Handle reset command
-        if (in_array($upperText, ['RESET', 'إعادة تعيين', 'RESTART'])) {
-            $this->clearUserLanguage($from);
-            $this->sendMessage($from, $this->messages['en']['reset']);
+        // For new users or when they ask for help, show welcome message
+        if (!$userLang || $this->isWelcomeRequest($lowerText, $userLang)) {
+            $this->sendMessage($from, $this->messages[$detectedLang]['welcome']);
             return;
         }
         
-        // If no language set, show welcome message
-        if (!$userLang) {
-            $this->sendMessage($from, $this->messages['en']['welcome']);
-            return;
-        }
-        
-        // Handle service list queries
-        if ($this->isServiceListQuery($userText)) {
-            $this->sendServiceList($from, $userLang);
-            return;
-        }
-        
-        // Handle pricing queries
-        if ($this->isPricingQuery($userText)) {
-            $this->sendPricingInfo($from, $userLang);
-            return;
-        }
-        
-        // Validate input
+        // Validate input length
         if (strlen($userText) < 2) {
             $this->sendInputValidationMessage($from, $userLang);
             return;
@@ -246,7 +235,13 @@ class WhatsAppWebhookController extends Controller
             'audio_id' => $audioData['id'] ?? 'unknown'
         ]);
 
-        $msgs = $userLang ? $this->messages[$userLang] : $this->messages['en'];
+        // Auto-detect language if not set
+        if (!$userLang) {
+            $userLang = 'en'; // Default to English for voice messages
+            $this->setUserLanguage($from, $userLang);
+        }
+
+        $msgs = $this->messages[$userLang];
         
         // Send acknowledgment that voice was received
         $this->sendMessage($from, $msgs['voiceReceived']);
@@ -265,6 +260,506 @@ class WhatsAppWebhookController extends Controller
     }
 
     /**
+     * Check if text is a navigation keyword
+     */
+    private function isNavigationKeyword($text, $userLang)
+    {
+        $navigationKeywords = [
+            'en' => ['services', 'categories', 'back', 'menu', 'help', 'start', 'home'],
+            'ar' => ['خدمات', 'فئات', 'رجوع', 'قائمة', 'مساعدة', 'بداية', 'الرئيسية']
+        ];
+        
+        $keywords = array_merge($navigationKeywords['en'], $navigationKeywords['ar']);
+        
+        foreach ($keywords as $keyword) {
+            if (strpos($text, $keyword) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Handle navigation commands
+     */
+    private function handleNavigation($from, $text, $userLang)
+    {
+        $isServicesRequest = strpos($text, 'services') !== false || strpos($text, 'خدمات') !== false;
+        $isCategoriesRequest = strpos($text, 'categories') !== false || strpos($text, 'فئات') !== false;
+        $isMenuRequest = strpos($text, 'menu') !== false || strpos($text, 'قائمة') !== false;
+        
+        if ($isServicesRequest) {
+            $this->sendAllServices($from, $userLang);
+        } elseif ($isCategoriesRequest || $isMenuRequest) {
+            $this->sendMessage($from, $this->messages[$userLang]['categories']);
+        } else {
+            // Default to welcome message for help/start/home
+            $this->sendMessage($from, $this->messages[$userLang]['welcome']);
+        }
+    }
+
+    /**
+     * Check if text is a category request
+     */
+    private function isCategoryRequest($text, $userLang)
+    {
+        $categoryKeywords = [
+            'en' => [
+                'pre-arrival' => ['pre-arrival', 'pre arrival', 'before arrival', 'airport pickup', 'early check'],
+                'arrival' => ['arrival', 'check-in', 'check in', 'welcome', 'luggage'],
+                'in-stay' => ['in-stay', 'in stay', 'during stay', 'room service', 'spa', 'laundry'],
+                'departure' => ['departure', 'check-out', 'check out', 'leaving', 'late checkout']
+            ],
+            'ar' => [
+                'pre-arrival' => ['قبل الوصول', 'ما قبل الوصول', 'نقل المطار', 'تسجيل مبكر'],
+                'arrival' => ['الوصول', 'تسجيل الدخول', 'ترحيب', 'أمتعة'],
+                'in-stay' => ['أثناء الإقامة', 'خلال الإقامة', 'خدمة الغرف', 'سبا', 'غسيل'],
+                'departure' => ['المغادرة', 'تسجيل الخروج', 'خروج متأخر']
+            ]
+        ];
+        
+        $allKeywords = array_merge($categoryKeywords['en'], $categoryKeywords['ar']);
+        
+        foreach ($allKeywords as $category => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (strpos($text, $keyword) !== false) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Handle category requests
+     */
+    private function handleCategoryRequest($from, $text, $userLang)
+    {
+        $categoryKeywords = [
+            'en' => [
+                'pre-arrival' => ['pre-arrival', 'pre arrival', 'before arrival', 'airport pickup', 'early check'],
+                'arrival' => ['arrival', 'check-in', 'check in', 'welcome', 'luggage'],
+                'in-stay' => ['in-stay', 'in stay', 'during stay', 'room service', 'spa', 'laundry'],
+                'departure' => ['departure', 'check-out', 'check out', 'leaving', 'late checkout']
+            ],
+            'ar' => [
+                'pre-arrival' => ['قبل الوصول', 'ما قبل الوصول', 'نقل المطار', 'تسجيل مبكر'],
+                'arrival' => ['الوصول', 'تسجيل الدخول', 'ترحيب', 'أمتعة'],
+                'in-stay' => ['أثناء الإقامة', 'خلال الإقامة', 'خدمة الغرف', 'سبا', 'غسيل'],
+                'departure' => ['المغادرة', 'تسجيل الخروج', 'خروج متأخر']
+            ]
+        ];
+        
+        $foundCategory = null;
+        $allKeywords = array_merge($categoryKeywords['en'], $categoryKeywords['ar']);
+        
+        foreach ($allKeywords as $category => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (strpos($text, $keyword) !== false) {
+                    $foundCategory = $category;
+                    break 2;
+                }
+            }
+        }
+        
+        if ($foundCategory) {
+            $this->sendCategoryServices($from, $foundCategory, $userLang);
+        } else {
+            $this->sendMessage($from, $this->messages[$userLang]['categories']);
+        }
+    }
+
+    /**
+     * Check if text is a welcome/help request
+     */
+    private function isWelcomeRequest($text, $userLang)
+    {
+        $welcomeKeywords = [
+            'en' => ['hi', 'hello', 'hey', 'start', 'help', 'what can you do'],
+            'ar' => ['مرحبا', 'أهلا', 'سلام', 'ابدأ', 'مساعدة', 'ماذا تستطيع']
+        ];
+        
+        $allKeywords = array_merge($welcomeKeywords['en'], $welcomeKeywords['ar']);
+        
+        foreach ($allKeywords as $keyword) {
+            if (strpos($text, $keyword) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Send all services grouped by category
+     */
+    private function sendAllServices($from, $userLang)
+    {
+        try {
+            $categories = DB::table('service_categories')->get();
+            $table = $userLang === 'ar' ? 'services_ar' : 'services_en';
+            $categoryNameField = $userLang === 'ar' ? 'name_ar' : 'name_en';
+            
+            $response = $userLang === 'ar' ? "🏨 **جميع الخدمات:**\n\n" : "🏨 **All Services:**\n\n";
+            
+            foreach ($categories as $category) {
+                $services = DB::table($table)
+                    ->where('category_id', $category->id)
+                    ->select('name', 'price')
+                    ->get();
+                
+                if ($services->count() > 0) {
+                    $categoryIcon = $this->getCategoryIcon($category->slug);
+                    $response .= "{$categoryIcon} **{$category->$categoryNameField}:**\n";
+                    
+                    foreach ($services as $service) {
+                        $price = floatval($service->price) > 0 ? " - {$service->price} SAR" : "";
+                        $response .= "• {$service->name}{$price}\n";
+                    }
+                    $response .= "\n";
+                }
+            }
+            
+            $footer = $userLang === 'ar' 
+                ? "💡 اكتب اسم الخدمة للتفاصيل أو 'فئات' للعودة للفئات"
+                : "💡 Type a service name for details or 'categories' to go back";
+            
+            $response .= $footer;
+            
+            $this->sendMessage($from, $response);
+            
+        } catch (\Exception $e) {
+            Log::error('Error sending all services:', [
+                'error' => $e->getMessage(),
+                'from' => $from
+            ]);
+            $this->sendMessage($from, $this->messages[$userLang]['error']);
+        }
+    }
+
+    /**
+     * Send services for a specific category
+     */
+    private function sendCategoryServices($from, $categorySlug, $userLang)
+    {
+        try {
+            $category = DB::table('service_categories')->where('slug', $categorySlug)->first();
+            if (!$category) {
+                $this->sendMessage($from, $this->messages[$userLang]['error']);
+                return;
+            }
+            
+            $table = $userLang === 'ar' ? 'services_ar' : 'services_en';
+            $categoryNameField = $userLang === 'ar' ? 'name_ar' : 'name_en';
+            
+            $services = DB::table($table)
+                ->where('category_id', $category->id)
+                ->select('name', 'description', 'price', 'image_url')
+                ->get();
+            
+            if ($services->count() === 0) {
+                $this->sendMessage($from, $this->messages[$userLang]['noResults']);
+                return;
+            }
+            
+            $categoryIcon = $this->getCategoryIcon($categorySlug);
+            $response = "{$categoryIcon} **{$category->$categoryNameField}**\n\n";
+            
+            foreach ($services as $service) {
+                $price = floatval($service->price) > 0 ? "\n💰 {$service->price} SAR" : "";
+                $serviceText = "✨ **{$service->name}**\n{$service->description}{$price}";
+                
+                // Send with image if available
+                if (isset($service->image_url) && $service->image_url) {
+                    $this->sendMessageWithImage($from, $serviceText, $service->image_url);
+                } else {
+                    $this->sendMessage($from, $serviceText);
+                }
+                
+                // Small delay between messages
+                usleep(500000); // 0.5 second delay
+            }
+            
+            $footer = $userLang === 'ar'
+                ? "\n💡 اكتب 'فئات' للعودة أو 'خدمات' لجميع الخدمات"
+                : "\n💡 Type 'categories' to go back or 'services' for all services";
+                
+            $this->sendMessage($from, $footer);
+            
+        } catch (\Exception $e) {
+            Log::error('Error sending category services:', [
+                'error' => $e->getMessage(),
+                'category' => $categorySlug,
+                'from' => $from
+            ]);
+            $this->sendMessage($from, $this->messages[$userLang]['error']);
+        }
+    }
+
+    /**
+     * Get emoji icon for category
+     */
+    private function getCategoryIcon($categorySlug)
+    {
+        $icons = [
+            'pre-arrival' => '🚗',
+            'arrival' => '📍',
+            'in-stay' => '🛎️',
+            'departure' => '✈️'
+        ];
+        
+        return $icons[$categorySlug] ?? '🏨';
+    }
+
+    /**
+     * Search for services and send results with fuzzy matching
+     */
+    private function searchAndSendServices($from, $text, $userLang)
+    {
+        try {
+            // Auto-detect search language
+            $hasArabicChars = preg_match('/[\x{0600}-\x{06FF}]/u', $text);
+            $searchLang = $hasArabicChars ? 'ar' : 'en';
+            
+            Log::info('Searching services', [
+                'from' => $from,
+                'text' => $text,
+                'search_lang' => $searchLang,
+                'user_lang' => $userLang
+            ]);
+            
+            // First try direct service search
+            $directMatch = $this->findDirectServiceMatch($text, $searchLang);
+            
+            if ($directMatch) {
+                $this->sendServiceResult($from, $directMatch, $userLang);
+                return;
+            }
+            
+            // Try fuzzy matching for suggestions
+            $suggestions = $this->findServiceSuggestions($text, $searchLang);
+            
+            if (!empty($suggestions)) {
+                $this->sendServiceSuggestions($from, $suggestions, $text, $userLang);
+                return;
+            }
+            
+            // No matches found
+            $msgs = $this->messages[$userLang];
+            $this->sendMessage($from, $msgs['noResults']);
+            
+        } catch (\Exception $e) {
+            Log::error('Service search error:', [
+                'error' => $e->getMessage(),
+                'from' => $from,
+                'text' => $text,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            $msgs = $this->messages[$userLang];
+            $this->sendMessage($from, $msgs['error']);
+        }
+    }
+
+    /**
+     * Find direct service match (exact or very close)
+     */
+    private function findDirectServiceMatch($text, $searchLang)
+    {
+        $table = $searchLang === 'ar' ? 'services_ar' : 'services_en';
+        $services = DB::table($table)->get();
+        
+        $normalize = function($string) use ($searchLang) {
+            $string = trim(strtolower($string));
+            if ($searchLang === 'ar') {
+                // Remove Arabic diacritics
+                $string = preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}]/u', '', $string);
+            } else {
+                // Remove punctuation and normalize spaces
+                $string = preg_replace('/[^a-z0-9\s]/', ' ', $string);
+                $string = preg_replace('/\s+/', ' ', $string);
+            }
+            return $string;
+        };
+        
+        $inputNorm = $normalize($text);
+        $inputWords = explode(' ', $inputNorm);
+        
+        $bestMatch = null;
+        $highestScore = 0;
+        
+        foreach ($services as $service) {
+            $nameNorm = $normalize($service->name);
+            $score = 0;
+            
+            // Exact name match (highest priority)
+            if ($nameNorm === $inputNorm) {
+                return $service;
+            }
+            
+            // Check if input contains service name
+            if (strpos($inputNorm, $nameNorm) !== false) {
+                $score += 100;
+            }
+            
+            // Check if service name contains input
+            if (strpos($nameNorm, $inputNorm) !== false) {
+                $score += 90;
+            }
+            
+            // Word-by-word matching
+            $nameWords = explode(' ', $nameNorm);
+            foreach ($inputWords as $inputWord) {
+                if (strlen($inputWord) > 2) {
+                    foreach ($nameWords as $nameWord) {
+                        if ($inputWord === $nameWord) {
+                            $score += 50;
+                        } elseif (strpos($nameWord, $inputWord) !== false) {
+                            $score += 30;
+                        } elseif (strpos($inputWord, $nameWord) !== false) {
+                            $score += 20;
+                        }
+                    }
+                }
+            }
+            
+            // Similar text scoring
+            similar_text($inputNorm, $nameNorm, $percent);
+            $score += $percent;
+            
+            if ($score > $highestScore) {
+                $highestScore = $score;
+                $bestMatch = $service;
+            }
+        }
+        
+        // Return if we have a good match (threshold for direct match)
+        return $highestScore > 60 ? $bestMatch : null;
+    }
+
+    /**
+     * Find service suggestions for fuzzy matching
+     */
+    private function findServiceSuggestions($text, $searchLang)
+    {
+        $table = $searchLang === 'ar' ? 'services_ar' : 'services_en';
+        $services = DB::table($table)->get();
+        
+        $suggestions = [];
+        $inputLower = strtolower($text);
+        
+        foreach ($services as $service) {
+            $nameLower = strtolower($service->name);
+            
+            // Calculate similarity for suggestions
+            similar_text($inputLower, $nameLower, $percent);
+            
+            // Also check for partial matches
+            $partialMatch = false;
+            if (strlen($text) >= 3) {
+                $partialMatch = strpos($nameLower, $inputLower) !== false || 
+                               strpos($inputLower, $nameLower) !== false;
+            }
+            
+            // If similarity is decent or there's a partial match, add to suggestions
+            if ($percent > 40 || $partialMatch) {
+                $suggestions[] = [
+                    'service' => $service,
+                    'score' => $percent + ($partialMatch ? 20 : 0)
+                ];
+            }
+        }
+        
+        // Sort by score and return top 3
+        usort($suggestions, function($a, $b) {
+            return $b['score'] - $a['score'];
+        });
+        
+        return array_slice($suggestions, 0, 3);
+    }
+
+    /**
+     * Send a single service result
+     */
+    private function sendServiceResult($from, $service, $userLang)
+    {
+        $msgs = $this->messages[$userLang];
+        
+        $serviceText = "✨ **{$service->name}**\n\n{$service->description}";
+        
+        if (isset($service->price) && floatval($service->price) > 0) {
+            $currency = $userLang === 'ar' ? 'ريال سعودي' : 'SAR';
+            $serviceText .= "\n\n💰 {$msgs['price']}: {$service->price} {$currency}";
+        }
+        
+        // Send with image if available
+        if (isset($service->image_url) && $service->image_url) {
+            $this->sendMessageWithImage($from, $serviceText, $service->image_url);
+        } else {
+            $this->sendMessage($from, $serviceText);
+        }
+        
+        // Send additional options
+        $additionalOptions = $userLang === 'ar'
+            ? "\n💡 اكتب 'خدمات' لجميع الخدمات أو 'فئات' للفئات\n🎤 يمكنك إرسال رسالة صوتية"
+            : "\n💡 Type 'services' for all services or 'categories' for categories\n🎤 You can send voice messages";
+            
+        $this->sendMessage($from, $additionalOptions);
+    }
+
+    /**
+     * Send service suggestions
+     */
+    private function sendServiceSuggestions($from, $suggestions, $originalText, $userLang)
+    {
+        $msgs = $this->messages[$userLang];
+        
+        $suggestionText = $userLang === 'ar' 
+            ? "🤔 لم أجد '{$originalText}' بالضبط. هل تقصد إحدى هذه الخدمات؟\n\n"
+            : "🤔 I couldn't find '{$originalText}' exactly. Did you mean one of these services?\n\n";
+        
+        foreach ($suggestions as $index => $suggestion) {
+            $service = $suggestion['service'];
+            $price = floatval($service->price) > 0 ? " ({$service->price} SAR)" : "";
+            $suggestionText .= "• {$service->name}{$price}\n";
+        }
+        
+        $suggestionText .= $userLang === 'ar'
+            ? "\n💡 اكتب اسم الخدمة بالضبط أو 'خدمات' لجميع الخدمات"
+            : "\n💡 Type the exact service name or 'services' for all services";
+        
+        $this->sendMessage($from, $suggestionText);
+    }
+
+    /**
+     * Send input validation message
+     */
+    private function sendInputValidationMessage($from, $userLang)
+    {
+        $shortResponse = $userLang === 'ar'
+            ? "🤔 يرجى كتابة اسم الخدمة أو سؤال أكثر تفصيلاً\n\n💡 مثال: سبا، نقل المطار، خدمة الغرف\n🎤 أو أرسل رسالة صوتية"
+            : "🤔 Please type a service name or more detailed question\n\n💡 Example: spa, airport transfer, room service\n🎤 Or send a voice message";
+            
+        $this->sendMessage($from, $shortResponse);
+    }
+
+    /**
+     * Process message status updates (delivered, read, etc.)
+     */
+    private function processMessageStatus($status)
+    {
+        Log::info('Message status update', [
+            'status' => $status['status'],
+            'message_id' => $status['id'],
+            'recipient_id' => $status['recipient_id']
+        ]);
+        
+        // You can store delivery status in database here if needed
+    }
+
+    /**
      * Handle media messages (images, videos, documents)
      */
     private function handleMediaMessage($from, $mediaType, $userLang)
@@ -274,7 +769,13 @@ class WhatsAppWebhookController extends Controller
             'type' => $mediaType
         ]);
 
-        $msgs = $userLang ? $this->messages[$userLang] : $this->messages['en'];
+        // Auto-detect language if not set
+        if (!$userLang) {
+            $userLang = 'en'; // Default to English
+            $this->setUserLanguage($from, $userLang);
+        }
+
+        $msgs = $this->messages[$userLang];
         
         $mediaResponse = $userLang === 'ar' 
             ? "📎 استلمت ملف {$mediaType}! يرجى إرسال نص للبحث عن الخدمات.\n\n💡 اكتب 'خدمات' لعرض قائمة الخدمات المتوفرة"
@@ -293,162 +794,17 @@ class WhatsAppWebhookController extends Controller
             'type' => $type
         ]);
 
+        // Auto-detect language if not set
+        if (!$userLang) {
+            $userLang = 'en'; // Default to English
+            $this->setUserLanguage($from, $userLang);
+        }
+
         $response = $userLang === 'ar'
             ? "🤖 نوع الرسالة غير مدعوم. يرجى إرسال نص أو رسالة صوتية للبحث عن الخدمات."
             : "🤖 Message type not supported. Please send text or voice message to search for services.";
             
         $this->sendMessage($from, $response);
-    }
-
-    /**
-     * Check if message is asking for service list
-     */
-    private function isServiceListQuery($text)
-    {
-        $lowerText = strtolower($text);
-        $serviceListKeywords = [
-            'what service', 'list', 'show', 'available', 'متوفر', 'services', 'خدمات',
-            'what can you do', 'help', 'مساعدة', 'ماذا تستطيع', 'menu', 'قائمة'
-        ];
-        
-        foreach ($serviceListKeywords as $keyword) {
-            if (strpos($lowerText, $keyword) !== false) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    /**
-     * Check if message is asking for pricing
-     */
-    private function isPricingQuery($text)
-    {
-        $lowerText = strtolower($text);
-        $pricingKeywords = [
-            'price', 'cost', 'rate', 'how much', 'سعر', 'تكلفة', 'كم', 'بكم'
-        ];
-        
-        foreach ($pricingKeywords as $keyword) {
-            if (strpos($lowerText, $keyword) !== false) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    /**
-     * Send service list
-     */
-    private function sendServiceList($from, $userLang)
-    {
-        $serviceListResponse = $userLang === 'ar' 
-            ? "🏨 الخدمات المتوفرة:\n\n🚗 نقل المطار\n🛎️ خدمة الغرف\n🧴 السبا والعافية\n🍽️ خدمة المطاعم\n👔 خدمة الغسيل\n⏰ تسجيل دخول مبكر\n🕐 تسجيل خروج متأخر\n🧳 مساعدة الأمتعة\n\n💡 اكتب اسم الخدمة أو أرسل رسالة صوتية للحصول على التفاصيل"
-            : "🏨 Available Services:\n\n🚗 Airport Transfer\n🛎️ Room Service\n🧴 Spa & Wellness\n🍽️ Restaurant Service\n👔 Laundry Service\n⏰ Early Check-in\n🕐 Late Checkout\n🧳 Luggage Assistance\n\n💡 Type a service name or send voice message for details";
-        
-        $this->sendMessage($from, $serviceListResponse);
-    }
-
-    /**
-     * Send pricing information
-     */
-    private function sendPricingInfo($from, $userLang)
-    {
-        $pricingResponse = $userLang === 'ar'
-            ? "💰 للاستعلام عن الأسعار:\n\nيرجى تحديد الخدمة أولاً (مثل: سبا، نقل المطار، خدمة الغرف) وسأعرض لك السعر والتفاصيل.\n\n💡 اكتب اسم الخدمة أو أرسل رسالة صوتية"
-            : "💰 For pricing information:\n\nPlease specify the service first (e.g., spa, airport transfer, room service) and I'll show you the price and details.\n\n💡 Type a service name or send voice message";
-        
-        $this->sendMessage($from, $pricingResponse);
-    }
-
-    /**
-     * Send input validation message
-     */
-    private function sendInputValidationMessage($from, $userLang)
-    {
-        $shortResponse = $userLang === 'ar'
-            ? "🤔 يرجى كتابة اسم الخدمة أو سؤال أكثر تفصيلاً\n\n💡 مثال: سبا، نقل المطار، خدمة الغرف\n🎤 أو أرسل رسالة صوتية"
-            : "🤔 Please type a service name or more detailed question\n\n💡 Example: spa, airport transfer, room service\n🎤 Or send a voice message";
-            
-        $this->sendMessage($from, $shortResponse);
-    }
-
-    /**
-     * Search for services and send results
-     */
-    private function searchAndSendServices($from, $text, $userLang)
-    {
-        $serviceController = new ServiceController();
-        
-        // Auto-detect search language
-        $hasArabicChars = preg_match('/[\x{0600}-\x{06FF}]/u', $text);
-        $searchLang = $hasArabicChars ? 'ar' : 'en';
-        
-        Log::info('Searching services', [
-            'from' => $from,
-            'text' => $text,
-            'search_lang' => $searchLang,
-            'user_lang' => $userLang
-        ]);
-        
-        $request = new Request(['text' => $text, 'lang' => $searchLang]);
-        $response = $serviceController->searchServiceByText($request);
-        $responseData = $response->getData(true);
-        
-        $msgs = $this->messages[$userLang];
-        
-        if (!empty($responseData) && is_array($responseData)) {
-            // Send up to 3 services
-            $services = array_slice($responseData, 0, 3);
-            
-            foreach ($services as $index => $service) {
-                $serviceText = "✨ {$service['name']}\n\n{$service['description']}";
-                
-                if (isset($service['price']) && floatval($service['price']) > 0) {
-                    $currency = $userLang === 'ar' ? 'ريال سعودي' : 'SAR';
-                    $serviceText .= "\n\n💰 {$msgs['price']}: {$service['price']} {$currency}";
-                }
-                
-                // Send with image if available
-                if (isset($service['image_url']) && $service['image_url']) {
-                    $this->sendMessageWithImage($from, $serviceText, $service['image_url']);
-                } else {
-                    $this->sendMessage($from, $serviceText);
-                }
-                
-                // Small delay between messages to avoid rate limiting
-                if ($index < count($services) - 1) {
-                    usleep(500000); // 0.5 second delay
-                }
-            }
-            
-            // Send additional options
-            $additionalOptions = $userLang === 'ar'
-                ? "\n💡 اكتب 'خدمات' لعرض جميع الخدمات\n🎤 يمكنك إرسال رسالة صوتية\n🔄 اكتب 'RESET' لتغيير اللغة"
-                : "\n💡 Type 'services' for all services\n🎤 You can send voice messages\n� Type 'RESET' to change language";
-                
-            $this->sendMessage($from, $additionalOptions);
-            
-        } else {
-            $noResultsMsg = $msgs['noResults'] . "\n\n💡 Type 'services' for full list\n🔄 Type 'RESET' to change language";
-            $this->sendMessage($from, $noResultsMsg);
-        }
-    }
-
-    /**
-     * Process message status updates (delivered, read, etc.)
-     */
-    private function processMessageStatus($status)
-    {
-        Log::info('Message status update', [
-            'status' => $status['status'],
-            'message_id' => $status['id'],
-            'recipient_id' => $status['recipient_id']
-        ]);
-        
-        // You can store delivery status in database here if needed
     }
 
     /**
@@ -591,21 +947,5 @@ class WhatsAppWebhookController extends Controller
     {
         Cache::forget("whatsapp_user_lang_{$userId}");
         Log::info('User language cleared', ['user' => $userId]);
-    }
-
-    /**
-     * Transcribe audio (placeholder for future implementation)
-     */
-    private function transcribeAudio($audioId)
-    {
-        // This is where you would implement speech-to-text
-        // Example integrations:
-        // - Google Cloud Speech-to-Text
-        // - Azure Cognitive Services Speech
-        // - AWS Transcribe
-        // - OpenAI Whisper
-        
-        // For now, return null to indicate transcription not available
-        return null;
     }
 }
