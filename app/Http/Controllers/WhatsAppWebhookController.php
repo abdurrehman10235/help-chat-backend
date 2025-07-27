@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use App\Http\Controllers\Api\ServiceController;
 
 class WhatsAppWebhookController extends Controller
@@ -249,18 +250,225 @@ class WhatsAppWebhookController extends Controller
             $this->setUserLanguage($from, $userLang);
         }
 
-        // Send helpful response for voice messages
-        $voiceResponse = $userLang === 'ar' 
-            ? "🎤 تم استلام رسالتك الصوتية!\n\n🤖 لمساعدتك بشكل أفضل، يرجى كتابة ما تريده:\n\n💡 **جرب هذه الخيارات:**\n• اكتب 'فئات' لرؤية جميع الفئات\n• اكتب 'خدمات' لرؤية جميع الخدمات\n• اكتب اسم خدمة مثل 'سبا' أو 'نقل المطار'\n• اكتب 'مساعدة' للمساعدة\n\n📝 الكتابة تساعدني في فهمك بدقة أكبر!"
-            : "🎤 Voice message received!\n\n🤖 To help you better, please type what you need:\n\n💡 **Try these options:**\n• Type 'categories' to see all categories\n• Type 'services' to see all services  \n• Type a service name like 'spa' or 'airport pickup'\n• Type 'help' for assistance\n\n📝 Typing helps me understand you more accurately!";
+        try {
+            // Send processing message first
+            $processingMsg = $userLang === 'ar' 
+                ? "🎤 معالجة رسالتك الصوتية... يرجى الانتظار لحظة"
+                : "🎤 Processing your voice message... Please wait a moment";
+            $this->sendMessage($from, $processingMsg);
+
+            // Transcribe the audio
+            $transcription = $this->transcribeAudio($audioData['id']);
             
-        $this->sendMessage($from, $voiceResponse);
-        
-        // For production, you could integrate speech-to-text services:
-        // $transcription = $this->transcribeAudio($audioData['id']);
-        // if ($transcription) {
-        //     $this->handleTextMessage($from, $transcription, $userLang);
-        // }
+            if ($transcription && !empty(trim($transcription))) {
+                Log::info('Voice transcription successful', [
+                    'from' => $from,
+                    'transcription' => $transcription
+                ]);
+                
+                // Send confirmation of what was heard
+                $confirmMsg = $userLang === 'ar' 
+                    ? "👂 سمعتك تقول: \"$transcription\"\n\n� البحث عن النتائج..."
+                    : "👂 I heard you say: \"$transcription\"\n\n🔍 Searching for results...";
+                $this->sendMessage($from, $confirmMsg);
+                
+                // Process the transcribed text as a regular text message
+                $this->handleTextMessage($from, $transcription, $userLang);
+            } else {
+                // Transcription failed or empty
+                $errorMsg = $userLang === 'ar' 
+                    ? "😔 عذراً، لم أتمكن من فهم رسالتك الصوتية.\n\n💡 **يرجى المحاولة مرة أخرى:**\n• تحدث بوضوح أكبر\n• تأكد من الهدوء حولك\n• أو اكتب رسالة نصية بدلاً من ذلك\n\n📝 يمكنك أيضاً كتابة 'فئات' أو 'خدمات'"
+                    : "😔 Sorry, I couldn't understand your voice message.\n\n💡 **Please try again:**\n• Speak more clearly\n• Ensure it's quiet around you\n• Or send a text message instead\n\n📝 You can also type 'categories' or 'services'";
+                $this->sendMessage($from, $errorMsg);
+            }
+        } catch (\Exception $e) {
+            Log::error('Voice transcription error', [
+                'from' => $from,
+                'error' => $e->getMessage()
+            ]);
+            
+            // Send fallback message
+            $fallbackMsg = $userLang === 'ar' 
+                ? "⚠️ حدث خطأ أثناء معالجة رسالتك الصوتية.\n\n📝 يرجى كتابة رسالة نصية أو اكتب 'مساعدة' للمساعدة."
+                : "⚠️ Error processing your voice message.\n\n📝 Please send a text message or type 'help' for assistance.";
+            $this->sendMessage($from, $fallbackMsg);
+        }
+    }
+
+    /**
+     * Transcribe audio using AssemblyAI
+     */
+    private function transcribeAudio($audioId)
+    {
+        try {
+            // Download the audio file from WhatsApp
+            $audioUrl = $this->getWhatsAppMediaUrl($audioId);
+            if (!$audioUrl) {
+                Log::error('Failed to get media URL for audio', ['audio_id' => $audioId]);
+                return null;
+            }
+
+            // Download the audio file
+            $audioContent = $this->downloadWhatsAppMedia($audioUrl);
+            if (!$audioContent) {
+                Log::error('Failed to download audio content', ['audio_id' => $audioId]);
+                return null;
+            }
+
+            // Save temporary file
+            $tempFile = tempnam(sys_get_temp_dir(), 'whatsapp_audio_') . '.ogg';
+            file_put_contents($tempFile, $audioContent);
+
+            // Upload audio to AssemblyAI
+            $uploadResponse = Http::withHeaders([
+                'authorization' => env('ASSEMBLYAI_API_KEY'),
+            ])->attach('file', file_get_contents($tempFile), 'audio.ogg')
+              ->post('https://api.assemblyai.com/v2/upload');
+
+            if (!$uploadResponse->successful()) {
+                Log::error('Failed to upload audio to AssemblyAI', [
+                    'audio_id' => $audioId,
+                    'response' => $uploadResponse->body()
+                ]);
+                unlink($tempFile);
+                return null;
+            }
+
+            $audioUrl = $uploadResponse->json()['upload_url'];
+
+            // Request transcription
+            $transcribeResponse = Http::withHeaders([
+                'authorization' => env('ASSEMBLYAI_API_KEY'),
+                'content-type' => 'application/json',
+            ])->post('https://api.assemblyai.com/v2/transcript', [
+                'audio_url' => $audioUrl,
+                'language_detection' => true,
+                'punctuate' => true,
+                'format_text' => true,
+            ]);
+
+            if (!$transcribeResponse->successful()) {
+                Log::error('Failed to request transcription from AssemblyAI', [
+                    'audio_id' => $audioId,
+                    'response' => $transcribeResponse->body()
+                ]);
+                unlink($tempFile);
+                return null;
+            }
+
+            $transcriptId = $transcribeResponse->json()['id'];
+
+            // Poll for completion (max 30 seconds)
+            $maxAttempts = 30;
+            $attempt = 0;
+            
+            while ($attempt < $maxAttempts) {
+                sleep(1);
+                $attempt++;
+
+                $statusResponse = Http::withHeaders([
+                    'authorization' => env('ASSEMBLYAI_API_KEY'),
+                ])->get("https://api.assemblyai.com/v2/transcript/{$transcriptId}");
+
+                if ($statusResponse->successful()) {
+                    $result = $statusResponse->json();
+                    
+                    if ($result['status'] === 'completed') {
+                        unlink($tempFile);
+                        
+                        $transcription = $result['text'] ?? '';
+                        Log::info('Transcription successful', [
+                            'audio_id' => $audioId,
+                            'transcription' => $transcription,
+                            'language' => $result['language_code'] ?? 'unknown'
+                        ]);
+                        
+                        return trim($transcription);
+                    } elseif ($result['status'] === 'error') {
+                        Log::error('AssemblyAI transcription failed', [
+                            'audio_id' => $audioId,
+                            'error' => $result['error'] ?? 'Unknown error'
+                        ]);
+                        unlink($tempFile);
+                        return null;
+                    }
+                }
+            }
+
+            // Timeout
+            Log::warning('Transcription timeout', ['audio_id' => $audioId]);
+            unlink($tempFile);
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('Audio transcription failed', [
+                'audio_id' => $audioId,
+                'error' => $e->getMessage()
+            ]);
+            if (isset($tempFile) && file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Get WhatsApp media URL
+     */
+    private function getWhatsAppMediaUrl($mediaId)
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('WHATSAPP_ACCESS_TOKEN')
+            ])->get("https://graph.facebook.com/v21.0/{$mediaId}");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['url'] ?? null;
+            }
+
+            Log::error('Failed to get media URL', [
+                'media_id' => $mediaId,
+                'response' => $response->body()
+            ]);
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('Error getting media URL', [
+                'media_id' => $mediaId,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Download WhatsApp media content
+     */
+    private function downloadWhatsAppMedia($mediaUrl)
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('WHATSAPP_ACCESS_TOKEN')
+            ])->get($mediaUrl);
+
+            if ($response->successful()) {
+                return $response->body();
+            }
+
+            Log::error('Failed to download media', [
+                'media_url' => $mediaUrl,
+                'status' => $response->status()
+            ]);
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('Error downloading media', [
+                'media_url' => $mediaUrl,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 
     /**
