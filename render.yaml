@@ -19,11 +19,13 @@ services:
         value: https://laravel-backend-zyy3.onrender.com/api
       - key: APP_URL
         value: https://laravel-backend-zyy3.onrender.com
+      # WhatsApp Business API credentials - SET THESE IN RENDER DASHBOARD
+      # DO NOT PUT REAL VALUES HERE - THIS FILE IS PUBLIC ON GITHUB
       - key: WHATSAPP_ACCESS_TOKEN
-        value: EAAQexrfMnrgBPG9YusT9IhSj4CSephNqLsKJZC1evN2TOjKxJbujA4zCwm9NS6vocCzvAF9hWcMlLj4ZCHjGw2UiQaXmwAz7FiT9P1qYglvFM6bkf7YZBoh58ClTJDJisD1LUP2aIKMVZC2XYVZCKnm9fZBPSaUpI2LQ68H0zzVJ7IVY2UbmVOe2Hh8bFqkLrCRdSRZBz1CSRCFZBBvuXIKVTQ4hHWLZB0L22CViMch9mD1g30wZDZD
+        sync: false  # Set manually in Render dashboard
       - key: WHATSAPP_PHONE_NUMBER_ID
-        value: 674311909107796
+        sync: false  # Set manually in Render dashboard  
       - key: WHATSAPP_BUSINESS_ACCOUNT_ID
-        value: 706999642168995
+        sync: false  # Set manually in Render dashboard
       - key: WHATSAPP_WEBHOOK_VERIFY_TOKEN
-        value: webhook_verify_secure_123
+        sync: false  # Set manually in Render dashboard
