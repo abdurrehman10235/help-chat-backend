@@ -45,6 +45,9 @@ EXPOSE 8000
 RUN echo '#!/bin/bash' > start.sh && \
     echo 'echo "Starting WhatsApp Business API application..."' >> start.sh && \
     echo 'echo "PORT: ${PORT:-8000}"' >> start.sh && \
+    echo 'php artisan route:clear || echo "Route clear failed, continuing..."' >> start.sh && \
+    echo 'php artisan config:clear || echo "Config clear failed, continuing..."' >> start.sh && \
+    echo 'php artisan cache:clear || echo "Cache clear failed, continuing..."' >> start.sh && \
     echo 'php artisan migrate --force || echo "Migration failed, continuing..."' >> start.sh && \
     echo 'php artisan db:seed --force || echo "Seeding failed, continuing..."' >> start.sh && \
     echo 'echo "Starting Laravel server on port ${PORT:-8000}..."' >> start.sh && \
