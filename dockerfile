@@ -41,14 +41,12 @@ RUN mkdir -p storage/app storage/framework/cache storage/framework/sessions stor
 
 EXPOSE 8000
 
-# Startup script (simplified - only run what changes between deployments)
+# Startup script for WhatsApp Business API (no Node.js bot needed)
 RUN echo '#!/bin/bash' > start.sh && \
-    echo 'echo "Starting application..."' >> start.sh && \
+    echo 'echo "Starting WhatsApp Business API application..."' >> start.sh && \
     echo 'echo "PORT: ${PORT:-8000}"' >> start.sh && \
     echo 'php artisan migrate --force || echo "Migration failed, continuing..."' >> start.sh && \
     echo 'php artisan db:seed --force || echo "Seeding failed, continuing..."' >> start.sh && \
-    echo 'echo "Starting WhatsApp bot in background..."' >> start.sh && \
-    echo 'node whatsapp-bot.js &' >> start.sh && \
     echo 'echo "Starting Laravel server on port ${PORT:-8000}..."' >> start.sh && \
     echo 'php artisan serve --host=0.0.0.0 --port=${PORT:-8000}' >> start.sh && \
     chmod +x start.sh

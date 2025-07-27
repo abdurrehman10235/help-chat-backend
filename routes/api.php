@@ -44,11 +44,22 @@ Route::delete('/service/{slug}', [ServiceController::class, 'destroy']);
 // **NEW**: Endpoint to get service categories (with language support)
 Route::get('/service-categories', [ServiceController::class, 'getCategories']);
 
-// WhatsApp Bot API endpoints
+// WhatsApp Bot API endpoints (Legacy - whatsapp-web.js)
 Route::get('/whatsapp/status', [WhatsAppBotController::class, 'getStatus']);
 Route::post('/whatsapp/restart', [WhatsAppBotController::class, 'restart']);
 Route::post('/whatsapp/status', [WhatsAppBotController::class, 'updateStatus']);
 Route::post('/whatsapp/qr', [WhatsAppBotController::class, 'updateQR']);
+
+// WhatsApp Business API Webhook (Official API)
+Route::get('/webhook/whatsapp', [App\Http\Controllers\WhatsAppWebhookController::class, 'verify']);
+Route::post('/webhook/whatsapp', [App\Http\Controllers\WhatsAppWebhookController::class, 'handle']);
+
+// WhatsApp Management API
+Route::get('/whatsapp-business/test-connection', [App\Http\Controllers\WhatsAppManagementController::class, 'testConnection']);
+Route::post('/whatsapp-business/send-test', [App\Http\Controllers\WhatsAppManagementController::class, 'sendTestMessage']);
+Route::get('/whatsapp-business/webhook-status', [App\Http\Controllers\WhatsAppManagementController::class, 'getWebhookStatus']);
+Route::post('/whatsapp-business/clear-users', [App\Http\Controllers\WhatsAppManagementController::class, 'clearAllUserData']);
+Route::get('/whatsapp-business/logs', [App\Http\Controllers\WhatsAppManagementController::class, 'getWebhookLogs']);
 
 // Web-like routes moved to API to bypass web middleware issues
 Route::get('/web-test', function () {
@@ -61,58 +72,40 @@ Route::get('/web-test', function () {
     ]);
 });
 
-Route::get('/web-whatsapp', function () {
+Route::get('/web-whatsapp-business', function () {
     $html = '<!DOCTYPE html>
 <html>
 <head>
-    <title>WhatsApp Bot - QR Code</title>
+    <title>WhatsApp Business API - Management Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
             font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
             margin: 0;
             padding: 20px;
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
         .container {
             background: white;
             border-radius: 15px;
-            padding: 40px;
+            padding: 30px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
             text-align: center;
-            max-width: 500px;
-            width: 100%;
+            margin-bottom: 30px;
         }
-        .qr-code {
-            max-width: 300px;
-            margin: 20px auto;
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 4px solid #25D366;
         }
-        .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-weight: bold;
-        }
-        .status.waiting {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-        .status.connected {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .refresh-btn {
+        .btn {
             background: #25D366;
             color: white;
             border: none;
@@ -120,95 +113,297 @@ Route::get('/web-whatsapp', function () {
             border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            margin-top: 20px;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #128C7E;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .response {
+            background: #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success {
+            border-left: 4px solid #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-left: 4px solid #dc3545;
+            background: #f8d7da;
+        }
+        .info {
+            border-left: 4px solid #17a2b8;
+            background: #d1ecf1;
+        }
+        .webhook-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">📱</div>
-        <h1>WhatsApp Bot</h1>
-        <div id="status">Loading...</div>
-        <div id="qr-container"></div>
-        <button onclick="refreshStatus()" class="refresh-btn">Refresh Status</button>
+        <div class="header">
+            <h1>📱 WhatsApp Business API</h1>
+            <p>Management Dashboard</p>
+        </div>
+
+        <div class="webhook-info">
+            <h3>🔗 Webhook Configuration</h3>
+            <p><strong>Webhook URL:</strong> <code id="webhook-url">Loading...</code></p>
+            <p><strong>Verify Token:</strong> <code>webhook_verify_secure_123</code></p>
+            <p>Use these values in your Meta Developer Console → WhatsApp → Configuration</p>
+        </div>
+
+        <div class="status-card">
+            <h3>📊 Connection Status</h3>
+            <button class="btn" onclick="testConnection()">Test API Connection</button>
+            <button class="btn btn-secondary" onclick="getWebhookStatus()">Get Configuration Status</button>
+            <div id="connection-status"></div>
+        </div>
+
+        <div class="status-card">
+            <h3>💬 Send Test Message</h3>
+            <div class="input-group">
+                <label>Phone Number (with country code):</label>
+                <input type="text" id="test-phone" placeholder="e.g., 1234567890" value="">
+            </div>
+            <div class="input-group">
+                <label>Message:</label>
+                <textarea id="test-message" rows="3" placeholder="Enter your test message">👋 Hello! This is a test message from WhatsApp Business API. The hotel service bot is working perfectly!</textarea>
+            </div>
+            <button class="btn" onclick="sendTestMessage()">Send Test Message</button>
+            <div id="test-message-result"></div>
+        </div>
+
+        <div class="status-card">
+            <h3>🎤 Voice Message Support</h3>
+            <p>✅ Voice messages are supported!</p>
+            <p>Users can send voice notes and the system will:</p>
+            <ul>
+                <li>Acknowledge receipt of voice message</li>
+                <li>Encourage users to send text or voice for service requests</li>
+                <li>Ready for future speech-to-text integration</li>
+            </ul>
+        </div>
+
+        <div class="status-card">
+            <h3>🔧 Management Actions</h3>
+            <button class="btn btn-secondary" onclick="clearUserData()">Clear All User Data</button>
+            <button class="btn btn-secondary" onclick="getWebhookLogs()">View Webhook Logs</button>
+            <div id="management-result"></div>
+        </div>
+
+        <div class="status-card">
+            <h3>📋 Feature Overview</h3>
+            <ul>
+                <li>✅ <strong>Official WhatsApp Business API</strong> - No QR codes needed</li>
+                <li>✅ <strong>Bilingual Support</strong> - English and Arabic</li>
+                <li>✅ <strong>Voice Message Recognition</strong> - Handles voice notes gracefully</li>
+                <li>✅ <strong>Service Search</strong> - Intelligent keyword matching</li>
+                <li>✅ <strong>Image Support</strong> - Send service images with descriptions</li>
+                <li>✅ <strong>User Sessions</strong> - Language preferences stored in cache</li>
+                <li>✅ <strong>Error Handling</strong> - Comprehensive logging and fallbacks</li>
+                <li>✅ <strong>Rate Limiting Protection</strong> - Delays between messages</li>
+            </ul>
+        </div>
     </div>
+
     <script>
-        async function refreshStatus() {
+        // Set webhook URL
+        document.getElementById("webhook-url").textContent = window.location.origin + "/api/webhook/whatsapp";
+
+        async function testConnection() {
             try {
-                console.log("Fetching status...");
-                const response = await fetch("/api/whatsapp/status");
-                console.log("Response status:", response.status);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
+                showLoading("connection-status", "Testing API connection...");
+                const response = await fetch("/api/whatsapp-business/test-connection");
                 const data = await response.json();
-                console.log("Status data:", data);
                 
-                let statusClass = "waiting";
-                let statusText = data.status || "No status available";
-                
-                // Handle different status types
-                if (data.status === "ready") {
-                    statusClass = "connected";
-                    statusText = "✅ Connected and Ready!";
-                } else if (data.status === "authenticated") {
-                    statusClass = "waiting";
-                    statusText = "🔐 Authenticated! Connecting to WhatsApp...";
-                } else if (data.status === "loading") {
-                    statusClass = "waiting";
-                    statusText = `📱 Loading WhatsApp... ${data.extra?.percent || 0}%`;
-                } else if (data.status === "qr_expired") {
-                    statusClass = "waiting";
-                    statusText = "⏰ QR Code Expired - Generating new one...";
-                } else if (data.status === "auth_failed") {
-                    statusClass = "error";
-                    statusText = "❌ Authentication Failed - Restarting...";
-                } else if (data.status === "disconnected") {
-                    statusClass = "error";
-                    statusText = "❌ Disconnected - Reconnecting...";
-                } else if (data.status === "qr_ready") {
-                    statusClass = "waiting";
-                    statusText = "📱 QR Code Ready - Scan within 60 seconds!";
-                } else if (data.status === "initializing") {
-                    statusClass = "waiting";
-                    statusText = "🚀 Initializing WhatsApp Bot...";
-                } else if (data.status === "timeout") {
-                    statusClass = "error";
-                    statusText = "⏰ Connection Timeout - Restarting...";
-                } else if (data.status === "error") {
-                    statusClass = "error";
-                    statusText = `❌ Error: ${data.message || "Unknown error"}`;
-                } else if (data.status === "unknown") {
-                    statusClass = "waiting";
-                    statusText = "❓ Status Unknown - Starting up...";
-                }
-                
-                document.getElementById("status").innerHTML = 
-                    `<div class="status ${statusClass}"><strong>Status:</strong> ${statusText}<br><strong>Message:</strong> ${data.message || "N/A"}<br><strong>Debug:</strong> Files exist: ${data.debug?.status_file_exists ? "Yes" : "No"}</div>`;
-                
-                if (data.qr && data.status === "qr_ready") {
-                    document.getElementById("qr-container").innerHTML = 
-                        `<h3>📱 Scan QR Code (expires in 60 seconds):</h3><img src="data:image/png;base64,${data.qr}" class="qr-code">
-                        <p style="color: #666; font-size: 14px;">✅ Take your time - you have 60 seconds to scan<br>📱 Open WhatsApp → Settings → Linked Devices → Link a Device</p>`;
-                } else if (data.status === "authenticated" || data.status === "loading") {
-                    document.getElementById("qr-container").innerHTML = "<p>🔐 QR Code scanned successfully! Connecting...</p>";
-                } else if (data.status === "ready") {
-                    document.getElementById("qr-container").innerHTML = "<p>✅ Successfully connected to WhatsApp!</p>";
+                if (data.status === "success") {
+                    showResult("connection-status", `
+                        <div class="response success">
+                            ✅ <strong>Connection Successful!</strong><br>
+                            Phone: ${data.phone_number}<br>
+                            Name: ${data.verified_name}
+                        </div>
+                    `);
                 } else {
-                    document.getElementById("qr-container").innerHTML = "<p>Waiting for QR code...</p>";
+                    showResult("connection-status", `
+                        <div class="response error">
+                            ❌ <strong>Connection Failed:</strong> ${data.message}
+                        </div>
+                    `);
                 }
             } catch (error) {
-                console.error("Status fetch error:", error);
-                document.getElementById("status").innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
-                document.getElementById("qr-container").innerHTML = "<p>❌ Unable to fetch status</p>";
+                showResult("connection-status", `
+                    <div class="response error">
+                        ❌ <strong>Error:</strong> ${error.message}
+                    </div>
+                `);
             }
         }
-        
-        // Auto-refresh every 3 seconds for better QR handling
-        refreshStatus();
-        setInterval(refreshStatus, 3000);
+
+        async function getWebhookStatus() {
+            try {
+                showLoading("connection-status", "Getting webhook status...");
+                const response = await fetch("/api/whatsapp-business/webhook-status");
+                const data = await response.json();
+                
+                let envStatus = "";
+                for (const [key, value] of Object.entries(data.environment)) {
+                    envStatus += `${key}: ${value}<br>`;
+                }
+                
+                showResult("connection-status", `
+                    <div class="response info">
+                        📋 <strong>Configuration Status:</strong><br>
+                        Webhook URL: ${data.webhook_url}<br>
+                        <br><strong>Environment Variables:</strong><br>
+                        ${envStatus}
+                    </div>
+                `);
+            } catch (error) {
+                showResult("connection-status", `
+                    <div class="response error">
+                        ❌ <strong>Error:</strong> ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        async function sendTestMessage() {
+            const phone = document.getElementById("test-phone").value;
+            const message = document.getElementById("test-message").value;
+            
+            if (!phone || !message) {
+                showResult("test-message-result", `
+                    <div class="response error">
+                        ❌ Please enter both phone number and message
+                    </div>
+                `);
+                return;
+            }
+            
+            try {
+                showLoading("test-message-result", "Sending test message...");
+                const response = await fetch("/api/whatsapp-business/send-test", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify({ phone, message })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === "success") {
+                    showResult("test-message-result", `
+                        <div class="response success">
+                            ✅ <strong>Message Sent!</strong><br>
+                            Message ID: ${data.message_id}
+                        </div>
+                    `);
+                } else {
+                    showResult("test-message-result", `
+                        <div class="response error">
+                            ❌ <strong>Failed to send:</strong> ${data.message}
+                        </div>
+                    `);
+                }
+            } catch (error) {
+                showResult("test-message-result", `
+                    <div class="response error">
+                        ❌ <strong>Error:</strong> ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        async function clearUserData() {
+            try {
+                showLoading("management-result", "Clearing user data...");
+                const response = await fetch("/api/whatsapp-business/clear-users", {
+                    method: "POST"
+                });
+                const data = await response.json();
+                
+                showResult("management-result", `
+                    <div class="response success">
+                        ✅ ${data.message}
+                    </div>
+                `);
+            } catch (error) {
+                showResult("management-result", `
+                    <div class="response error">
+                        ❌ <strong>Error:</strong> ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        async function getWebhookLogs() {
+            try {
+                showLoading("management-result", "Getting webhook logs...");
+                const response = await fetch("/api/whatsapp-business/logs");
+                const data = await response.json();
+                
+                showResult("management-result", `
+                    <div class="response info">
+                        📝 <strong>Logs Location:</strong><br>
+                        ${data.log_location}<br>
+                        <br>Check Laravel logs for detailed webhook activity.
+                    </div>
+                `);
+            } catch (error) {
+                showResult("management-result", `
+                    <div class="response error">
+                        ❌ <strong>Error:</strong> ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        function showLoading(elementId, message) {
+            document.getElementById(elementId).innerHTML = `
+                <div class="response info">
+                    ⏳ ${message}
+                </div>
+            `;
+        }
+
+        function showResult(elementId, html) {
+            document.getElementById(elementId).innerHTML = html;
+        }
+
+        // Auto-test connection on page load
+        setTimeout(testConnection, 1000);
     </script>
 </body>
 </html>';

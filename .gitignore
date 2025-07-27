@@ -31,7 +31,7 @@ Thumbs.db
 /whatsapp_qr.txt
 /whatsapp_status.json
 /whatsapp_restart.flag
-
+/whatsapp-session
 # Storage files
 /storage/app/whatsapp_*
 /storage/logs/whatsapp.log
