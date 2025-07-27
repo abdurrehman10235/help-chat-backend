@@ -21,6 +21,7 @@ class WhatsAppWebhookController extends Controller
             'error' => "❌ Sorry, something went wrong. Please try again or type 'categories' to start over.",
             'suggestion' => "🤔 Did you mean",
             'voiceReceived' => "🎤 Voice message received! I can understand voice messages.\n\n💡 Just speak naturally - I'll help you find the right service!",
+            'help' => "🤖 **How to use this bot:**\n\n📋 **Quick Commands:**\n• 'categories' - Browse service categories\n• 'services' - See all available services\n• 'help' - Show this help message\n\n🔍 **Search Tips:**\n• Type service names like 'spa', 'room service', 'airport'\n• Use category names like 'arrival', 'in-stay'\n• I understand typos and similar words!\n\n🎤 **Voice Messages:**\n• Send voice messages anytime\n• For best results, also try typing your request\n\n💡 Just tell me what you need and I'll help you find it!"
         ],
         'ar' => [
             'welcome' => "👋 أهلاً وسهلاً بك في مساعد خدمات الفندق!\n\n🏨 **فئات الخدمات:**\n\n🚗 **قبل الوصول** - نقل المطار، تسجيل دخول مبكر، تفضيلات الغرفة\n📍 **الوصول** - مشروب ترحيب، مساعدة الأمتعة، تسجيل دخول سريع\n🛎️ **أثناء الإقامة** - خدمة الغرف، الغسيل، خدمات السبا\n✈️ **المغادرة** - تسجيل خروج متأخر، حفظ الأمتعة، توصيل المطار\n\n💡 **نصائح سريعة:**\n• اختر فئة أو اسأل عن خدمة معينة\n• اكتب 'خدمات' لرؤية جميع الخدمات\n• الرسائل الصوتية مدعومة 🎤\n\nكيف يمكنني مساعدتك اليوم؟",
@@ -31,6 +32,7 @@ class WhatsAppWebhookController extends Controller
             'error' => "❌ عذراً، حدث خطأ. يرجى المحاولة مرة أخرى أو اكتب 'فئات' للبدء من جديد.",
             'suggestion' => "🤔 هل تقصد",
             'voiceReceived' => "🎤 تم استلام الرسالة الصوتية! يمكنني فهم الرسائل الصوتية.\n\n💡 تحدث بشكل طبيعي - سأساعدك في العثور على الخدمة المناسبة!",
+            'help' => "🤖 **كيفية استخدام هذا البوت:**\n\n📋 **أوامر سريعة:**\n• 'فئات' - تصفح فئات الخدمات\n• 'خدمات' - عرض جميع الخدمات المتاحة\n• 'مساعدة' - عرض رسالة المساعدة هذه\n\n🔍 **نصائح البحث:**\n• اكتب أسماء الخدمات مثل 'سبا'، 'خدمة الغرف'، 'المطار'\n• استخدم أسماء الفئات مثل 'الوصول'، 'أثناء الإقامة'\n• أفهم الأخطاء الإملائية والكلمات المشابهة!\n\n🎤 **الرسائل الصوتية:**\n• أرسل رسائل صوتية في أي وقت\n• للحصول على أفضل النتائج، جرب أيضاً كتابة طلبك\n\n💡 فقط أخبرني بما تحتاجه وسأساعدك في العثور عليه!"
         ]
     ];
 
@@ -209,7 +211,13 @@ class WhatsAppWebhookController extends Controller
             return;
         }
         
-        // For new users or when they ask for help, show welcome message
+        // Handle help requests specifically
+        if ($this->isHelpRequest($lowerText, $userLang)) {
+            $this->sendMessage($from, $this->messages[$detectedLang]['help']);
+            return;
+        }
+        
+        // For new users or welcome messages
         if (!$userLang || $this->isWelcomeRequest($lowerText, $userLang)) {
             $this->sendMessage($from, $this->messages[$detectedLang]['welcome']);
             return;
@@ -241,21 +249,17 @@ class WhatsAppWebhookController extends Controller
             $this->setUserLanguage($from, $userLang);
         }
 
-        $msgs = $this->messages[$userLang];
+        // Send helpful response for voice messages
+        $voiceResponse = $userLang === 'ar' 
+            ? "🎤 تم استلام رسالتك الصوتية!\n\n🤖 لمساعدتك بشكل أفضل، يرجى كتابة ما تريده:\n\n💡 **جرب هذه الخيارات:**\n• اكتب 'فئات' لرؤية جميع الفئات\n• اكتب 'خدمات' لرؤية جميع الخدمات\n• اكتب اسم خدمة مثل 'سبا' أو 'نقل المطار'\n• اكتب 'مساعدة' للمساعدة\n\n📝 الكتابة تساعدني في فهمك بدقة أكبر!"
+            : "🎤 Voice message received!\n\n🤖 To help you better, please type what you need:\n\n💡 **Try these options:**\n• Type 'categories' to see all categories\n• Type 'services' to see all services  \n• Type a service name like 'spa' or 'airport pickup'\n• Type 'help' for assistance\n\n📝 Typing helps me understand you more accurately!";
+            
+        $this->sendMessage($from, $voiceResponse);
         
-        // Send acknowledgment that voice was received
-        $this->sendMessage($from, $msgs['voiceReceived']);
-        
-        // For now, we'll ask them to send text instead
-        // In a production environment, you could integrate with speech-to-text services
-        // like Google Speech-to-Text, Azure Speech, or AWS Transcribe
-        
-        // Example of how you could implement voice processing:
+        // For production, you could integrate speech-to-text services:
         // $transcription = $this->transcribeAudio($audioData['id']);
         // if ($transcription) {
         //     $this->handleTextMessage($from, $transcription, $userLang);
-        // } else {
-        //     $this->sendMessage($from, $msgs['voiceError']);
         // }
     }
 
@@ -372,13 +376,34 @@ class WhatsAppWebhookController extends Controller
     }
 
     /**
-     * Check if text is a welcome/help request
+     * Check if text is a help request
+     */
+    private function isHelpRequest($text, $userLang)
+    {
+        $helpKeywords = [
+            'en' => ['help', 'what can you do', 'how to use', 'commands', 'instructions'],
+            'ar' => ['مساعدة', 'ماذا تستطيع', 'كيف استخدم', 'أوامر', 'تعليمات']
+        ];
+        
+        $allKeywords = array_merge($helpKeywords['en'], $helpKeywords['ar']);
+        
+        foreach ($allKeywords as $keyword) {
+            if (strpos($text, $keyword) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Check if text is a welcome request
      */
     private function isWelcomeRequest($text, $userLang)
     {
         $welcomeKeywords = [
-            'en' => ['hi', 'hello', 'hey', 'start', 'help', 'what can you do'],
-            'ar' => ['مرحبا', 'أهلا', 'سلام', 'ابدأ', 'مساعدة', 'ماذا تستطيع']
+            'en' => ['hi', 'hello', 'hey', 'start'],
+            'ar' => ['مرحبا', 'أهلا', 'سلام', 'ابدأ']
         ];
         
         $allKeywords = array_merge($welcomeKeywords['en'], $welcomeKeywords['ar']);
