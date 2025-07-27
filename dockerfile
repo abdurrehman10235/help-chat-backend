@@ -50,6 +50,11 @@ RUN echo '#!/bin/bash' > start.sh && \
     echo 'echo "Creating SQLite database..."' >> start.sh && \
     echo 'touch /var/www/database/database.sqlite' >> start.sh && \
     echo 'chmod 666 /var/www/database/database.sqlite' >> start.sh && \
+    echo 'echo "Setting database configuration..."' >> start.sh && \
+    echo 'export DB_CONNECTION=sqlite' >> start.sh && \
+    echo 'export DB_DATABASE=/var/www/database/database.sqlite' >> start.sh && \
+    echo 'export CACHE_STORE=file' >> start.sh && \
+    echo 'export SESSION_DRIVER=file' >> start.sh && \
     echo 'php artisan route:clear || echo "Route clear failed, continuing..."' >> start.sh && \
     echo 'php artisan config:clear || echo "Config clear failed, continuing..."' >> start.sh && \
     echo 'php artisan cache:clear || echo "Cache clear failed, continuing..."' >> start.sh && \
