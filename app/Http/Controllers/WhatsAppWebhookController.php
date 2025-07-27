@@ -257,8 +257,8 @@ class WhatsAppWebhookController extends Controller
                 : "🎤 Processing your voice message... Please wait a moment";
             $this->sendMessage($from, $processingMsg);
 
-            // Transcribe the audio
-            $transcription = $this->transcribeAudio($audioData['id']);
+            // Transcribe the audio using AssemblyAI
+            $transcription = $this->transcribeAudioSimple($audioData['id']);
             
             if ($transcription && !empty(trim($transcription))) {
                 Log::info('Voice transcription successful', [
@@ -402,6 +402,83 @@ class WhatsAppWebhookController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Audio transcription failed', [
+                'audio_id' => $audioId,
+                'error' => $e->getMessage()
+            ]);
+            if (isset($tempFile) && file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Simple and fast transcription using AssemblyAI
+     */
+    private function transcribeAudioSimple($audioId)
+    {
+        try {
+            // Download the audio file from WhatsApp
+            $audioUrl = $this->getWhatsAppMediaUrl($audioId);
+            if (!$audioUrl) {
+                return null;
+            }
+
+            $audioContent = $this->downloadWhatsAppMedia($audioUrl);
+            if (!$audioContent) {
+                return null;
+            }
+
+            // Save temporary file
+            $tempFile = tempnam(sys_get_temp_dir(), 'whatsapp_audio_') . '.ogg';
+            file_put_contents($tempFile, $audioContent);
+
+            // Use AssemblyAI's simple API
+            $response = Http::timeout(30)->withHeaders([
+                'authorization' => env('ASSEMBLYAI_API_KEY'),
+            ])->attach('audio', file_get_contents($tempFile), 'audio.ogg')
+              ->post('https://api.assemblyai.com/v2/upload');
+
+            if ($response->successful()) {
+                $uploadUrl = $response->json()['upload_url'];
+                
+                // Request transcription
+                $transcriptResponse = Http::timeout(30)->withHeaders([
+                    'authorization' => env('ASSEMBLYAI_API_KEY'),
+                    'content-type' => 'application/json',
+                ])->post('https://api.assemblyai.com/v2/transcript', [
+                    'audio_url' => $uploadUrl,
+                ]);
+
+                if ($transcriptResponse->successful()) {
+                    $transcriptId = $transcriptResponse->json()['id'];
+                    
+                    // Simple polling for completion (max 30 seconds)
+                    for ($i = 0; $i < 10; $i++) {
+                        sleep(3);
+                        
+                        $result = Http::timeout(10)->withHeaders([
+                            'authorization' => env('ASSEMBLYAI_API_KEY'),
+                        ])->get("https://api.assemblyai.com/v2/transcript/{$transcriptId}");
+                        
+                        if ($result->successful()) {
+                            $data = $result->json();
+                            if ($data['status'] === 'completed') {
+                                unlink($tempFile);
+                                return trim($data['text'] ?? '');
+                            } elseif ($data['status'] === 'error') {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            unlink($tempFile);
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('Simple transcription failed', [
                 'audio_id' => $audioId,
                 'error' => $e->getMessage()
             ]);
