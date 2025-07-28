@@ -1,13 +1,8 @@
 {
     "private": true,
     "scripts": {
-        "whatsapp": "node whatsapp-bot.js",
         "start": "php artisan serve"
     },
     "dependencies": {
-        "axios": "^1.11.0",
-        "puppeteer": "^24.14.0",
-        "qrcode": "^1.5.4",
-        "whatsapp-web.js": "^1.31.0"
     }
 }

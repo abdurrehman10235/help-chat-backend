@@ -299,9 +299,196 @@ class WhatsAppWebhookController extends Controller
             return;
         }
         
-        // Default: Send welcome message
-        $this->sendWelcomeMessage($from, $userLang);
-        $this->setUserState($from, 'main');
+        // Try intelligent service search for unmatched text
+        $searchResult = $this->searchForServices($from, $lowerText, $userLang);
+        
+        // If no service found, send welcome message
+        if (!$searchResult) {
+            $this->sendWelcomeMessage($from, $userLang);
+            $this->setUserState($from, 'main');
+        }
+    }
+
+    /**
+     * Enhanced service search with better matching
+     */
+    private function searchForServices($from, $text, $userLang)
+    {
+        try {
+            // Auto-detect search language
+            $hasArabicChars = preg_match('/[\x{0600}-\x{06FF}]/u', $text);
+            $searchLang = $hasArabicChars ? 'ar' : 'en';
+            
+            Log::info('Enhanced service search', [
+                'from' => $from,
+                'text' => $text,
+                'search_lang' => $searchLang,
+                'user_lang' => $userLang
+            ]);
+            
+            // Enhanced direct service search with better matching
+            $directMatch = $this->findEnhancedServiceMatch($text, $searchLang);
+            
+            if ($directMatch) {
+                $this->sendServiceResult($from, $directMatch, $userLang);
+                return true;
+            }
+            
+            return false;
+            
+        } catch (\Exception $e) {
+            Log::error('Enhanced service search error:', [
+                'error' => $e->getMessage(),
+                'from' => $from,
+                'text' => $text
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Enhanced service matching with better fuzzy logic
+     */
+    private function findEnhancedServiceMatch($text, $searchLang)
+    {
+        $table = $searchLang === 'ar' ? 'services_ar' : 'services_en';
+        $services = DB::table($table)->get();
+        
+        $normalize = function($string) use ($searchLang) {
+            $string = trim(strtolower($string));
+            if ($searchLang === 'ar') {
+                // Remove Arabic diacritics
+                $string = preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}]/u', '', $string);
+            } else {
+                // Remove punctuation and normalize spaces
+                $string = preg_replace('/[^a-z0-9\s]/', ' ', $string);
+                $string = preg_replace('/\s+/', ' ', $string);
+            }
+            return $string;
+        };
+        
+        $inputNorm = $normalize($text);
+        $inputWords = explode(' ', $inputNorm);
+        
+        $bestMatch = null;
+        $highestScore = 0;
+        
+        foreach ($services as $service) {
+            $nameNorm = $normalize($service->name);
+            $descNorm = $normalize($service->description ?? '');
+            $score = 0;
+            
+            // Exact name match (highest priority)
+            if ($nameNorm === $inputNorm) {
+                return $service;
+            }
+            
+            // Enhanced keyword matching for specific services
+            $enhancedScore = $this->getEnhancedServiceScore($inputNorm, $inputWords, $service, $nameNorm, $descNorm);
+            $score += $enhancedScore;
+            
+            // Check if input contains service name words
+            $nameWords = explode(' ', $nameNorm);
+            foreach ($nameWords as $nameWord) {
+                if (strlen($nameWord) > 2) {
+                    if (strpos($inputNorm, $nameWord) !== false) {
+                        $score += 40;
+                    }
+                }
+            }
+            
+            // Check if service name contains input words
+            foreach ($inputWords as $inputWord) {
+                if (strlen($inputWord) > 2) {
+                    if (strpos($nameNorm, $inputWord) !== false) {
+                        $score += 30;
+                    }
+                    if (strpos($descNorm, $inputWord) !== false) {
+                        $score += 15;
+                    }
+                }
+            }
+            
+            // Similar text scoring
+            similar_text($inputNorm, $nameNorm, $percent);
+            $score += $percent * 0.8;
+            
+            if ($score > $highestScore) {
+                $highestScore = $score;
+                $bestMatch = $service;
+            }
+        }
+        
+        // Return if we have a good match (lowered threshold for better matching)
+        return $highestScore > 35 ? $bestMatch : null;
+    }
+
+    /**
+     * Enhanced scoring for specific service patterns
+     */
+    private function getEnhancedServiceScore($inputNorm, $inputWords, $service, $nameNorm, $descNorm)
+    {
+        $score = 0;
+        $slug = $service->slug ?? '';
+        
+        // Special matching patterns for common queries
+        $patterns = [
+            // Al-Balad patterns
+            'balad' => ['al-balad', 'balad-site', 'historic'],
+            'historic' => ['al-balad', 'balad-site', 'historic'],
+            'al balad' => ['al-balad', 'balad-site', 'historic'],
+            'old town' => ['al-balad', 'balad-site', 'historic'],
+            'unesco' => ['al-balad', 'balad-site', 'historic'],
+            
+            // Room service patterns
+            'room service' => ['room-service', 'club-sandwich', 'pasta-alfredo', 'grilled-salmon'],
+            'food' => ['room-service', 'restaurant', 'club-sandwich', 'pasta-alfredo'],
+            'meal' => ['room-service', 'restaurant', 'club-sandwich', 'pasta-alfredo'],
+            'order' => ['room-service', 'club-sandwich', 'pasta-alfredo'],
+            
+            // Laundry patterns
+            'laundry' => ['laundry'],
+            'washing' => ['laundry'],
+            'cleaning' => ['laundry'],
+            'clothes' => ['laundry'],
+            
+            // Restaurant patterns
+            'restaurant' => ['restaurant'],
+            'dining' => ['restaurant'],
+            'buffet' => ['restaurant'],
+            
+            // Gym patterns
+            'gym' => ['gym'],
+            'fitness' => ['gym'],
+            'exercise' => ['gym'],
+            'workout' => ['gym'],
+            
+            // Reception patterns
+            'reception' => ['reception', 'wake-up-call', 'visitor-invitation'],
+            'front desk' => ['reception'],
+            'concierge' => ['reception'],
+            'wake up' => ['wake-up-call'],
+            'visitor' => ['visitor-invitation'],
+            
+            // Jeddah patterns
+            'jeddah' => ['jeddah-resorts', 'balad-site', 'corniche-site', 'king-fahd-fountain'],
+            'corniche' => ['corniche-site'],
+            'fountain' => ['king-fahd-fountain'],
+            'king fahd' => ['king-fahd-fountain'],
+            'shopping' => ['shopping-mall'],
+            'mall' => ['shopping-mall'],
+            'resort' => ['jeddah-resorts'],
+        ];
+        
+        // Check for pattern matches
+        foreach ($patterns as $pattern => $targetSlugs) {
+            if (strpos($inputNorm, $pattern) !== false && in_array($slug, $targetSlugs)) {
+                $score += 80;
+                break;
+            }
+        }
+        
+        return $score;
     }
 
     // Helper methods for message detection
