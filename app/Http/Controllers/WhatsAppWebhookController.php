@@ -488,9 +488,86 @@ class WhatsAppWebhookController extends Controller
     // Helper methods for sending messages
     private function sendWelcomeMessage($from, $lang)
     {
+        // Check if we should show the full branded header
+        if ($this->shouldShowBrandedWelcome($from)) {
+            $this->sendBrandedWelcomeHeader($from, $lang);
+        } else {
+            // Send shorter welcome for returning users
+            $this->sendQuickWelcome($from, $lang);
+        }
+    }
+
+    private function shouldShowBrandedWelcome($from)
+    {
+        $lastSeen = session("last_seen_$from");
+        $sixHoursAgo = time() - (6 * 60 * 60); // 6 hours in seconds
+        
+        // Show branded welcome if user is new or hasn't been seen in 6+ hours
+        return !$lastSeen || $lastSeen < $sixHoursAgo;
+    }
+
+    private function sendBrandedWelcomeHeader($from, $lang)
+    {
+        // Update last seen timestamp
+        session(["last_seen_$from" => time()]);
+        
+        $header = [
+            'en' => "
+🏨 **ELITE HOTEL CASABLANCA** 🏨
+═══════════════════════════════════════
+✨ *Luxury • Comfort • Excellence* ✨
+═══════════════════════════════════════
+
+🌟 Welcome Mr. Ali 🌟
+Thank You for Visiting Elite Hotel Casablanca
+
+📶 *Your WiFi Password:* **183738134**
+🔑 *Your Digital Concierge is Ready*
+
+Have a pleasant stay with us!
+
+How can I assist you today?
+
+🏨 *1️⃣ Hotel Tour* - Explore our facilities
+🌃 *2️⃣ Explore Jeddah* - Discover the city
+
+💡 Type *Main Menu* anytime to return here.",
+
+            'ar' => "
+🏨 **فندق إليت الدار البيضاء** 🏨
+═══════════════════════════════════════
+✨ *الفخامة • الراحة • التميز* ✨
+═══════════════════════════════════════
+
+🌟 مرحباً سيد علي 🌟
+شكراً لزيارتكم فندق إليت الدار البيضاء
+
+📶 *كلمة مرور الواي فاي:* **183738134**
+🔑 *مساعدكم الرقمي جاهز للخدمة*
+
+نتمنى لكم إقامة سعيدة!
+
+كيف يمكنني مساعدتك اليوم؟
+
+🏨 *1️⃣ جولة الفندق* - استكشف مرافقنا
+🌃 *2️⃣ استكشاف جدة* - اكتشف المدينة
+
+💡 اكتب *القائمة الرئيسية* في أي وقت للعودة هنا."
+        ];
+        
+        // Send the branded welcome message with hotel logo
+        $logoUrl = url('/logo.jpg');
+        $this->sendMessageWithImage($from, $header[$lang] ?? $header['en'], $logoUrl);
+    }
+
+    private function sendQuickWelcome($from, $lang)
+    {
+        // Update last seen timestamp
+        session(["last_seen_$from" => time()]);
+        
         $message = [
-            'en' => "Welcome Mr. Ali\nThank You for Visiting Elite Casablanca\nYour wifi password is 183738134\nHave a pleasant stay with us\n\nHow can I help you today?\n\n1️⃣ *Hotel Tour* - Explore our facilities\n2️⃣ *Explore Jeddah* - Discover the city\n\nType *Main Menu* anytime to return here.",
-            'ar' => "مرحباً سيد علي\nشكراً لزيارتكم فندق إليت الدار البيضاء\nكلمة مرور الواي فاي: 183738134\nنتمنى لكم إقامة سعيدة\n\nكيف يمكنني مساعدتك اليوم؟\n\n1️⃣ *جولة الفندق* - استكشف مرافقنا\n2️⃣ *استكشاف جدة* - اكتشف المدينة\n\nاكتب *القائمة الرئيسية* في أي وقت للعودة هنا."
+            'en' => "🏨 *Elite Hotel Casablanca* 🏨\n\nWelcome back, Mr. Ali!\n\nHow can I help you today?\n\n1️⃣ *Hotel Tour* - Explore our facilities\n2️⃣ *Explore Jeddah* - Discover the city\n\nType *Main Menu* anytime to return here.",
+            'ar' => "🏨 *فندق إليت الدار البيضاء* 🏨\n\nمرحباً بعودتك، سيد علي!\n\nكيف يمكنني مساعدتك اليوم؟\n\n1️⃣ *جولة الفندق* - استكشف مرافقنا\n2️⃣ *استكشاف جدة* - اكتشف المدينة\n\nاكتب *القائمة الرئيسية* في أي وقت للعودة هنا."
         ];
         
         $this->sendMessage($from, $message[$lang] ?? $message['en']);
