@@ -175,11 +175,12 @@ class WhatsAppWebhookController extends Controller
     }
 
     /**
-     * Handle text messages with new hotel flow
+     * Handle text messages
      */
     private function handleTextMessage($from, $text, $userLang)
     {
         $userText = trim($text);
+        $upperText = strtoupper($userText);
         $lowerText = strtolower($userText);
         
         // Auto-detect language from input text
@@ -199,476 +200,38 @@ class WhatsAppWebhookController extends Controller
             'user_language' => $userLang
         ]);
 
-        // Get user's current context/state
-        $userState = $this->getUserState($from);
-        
-        // Handle navigation commands first
-        if ($this->isBackCommand($lowerText, $userLang)) {
-            $this->handleBackNavigation($from, $userLang, $userState);
+        // Handle navigation keywords first
+        if ($this->isNavigationKeyword($lowerText, $userLang)) {
+            $this->handleNavigation($from, $lowerText, $userLang);
             return;
         }
         
-        if ($this->isMainMenuCommand($lowerText, $userLang)) {
-            $this->sendWelcomeMessage($from, $userLang);
-            $this->setUserState($from, 'main');
+        // Handle category requests
+        if ($this->isCategoryRequest($lowerText, $userLang)) {
+            $this->handleCategoryRequest($from, $lowerText, $userLang);
             return;
         }
         
-        // Handle based on current state
-        switch ($userState) {
-            case 'wake-up-call':
-                $this->handleWakeUpTimeInput($from, $userText, $userLang);
-                break;
-                
-            case 'visitor-invitation':
-                $this->handleVisitorNameInput($from, $userText, $userLang);
-                break;
-                
-            default:
-                $this->handleMainFlowInput($from, $lowerText, $userLang);
-                break;
-        }
-    }
-    
-    /**
-     * Handle main conversation flow
-     */
-    private function handleMainFlowInput($from, $lowerText, $userLang)
-    {
-        // Welcome/greeting messages
-        if ($this->isWelcomeMessage($lowerText, $userLang)) {
-            $this->sendWelcomeMessage($from, $userLang);
-            $this->setUserState($from, 'main');
+        // Handle help requests specifically
+        if ($this->isHelpRequest($lowerText, $userLang)) {
+            $this->sendMessage($from, $this->messages[$detectedLang]['help']);
             return;
         }
         
-        // Main categories
-        if ($this->isHotelTourRequest($lowerText, $userLang)) {
-            $this->sendHotelTourMenu($from, $userLang);
-            $this->setUserState($from, 'hotel-tour');
+        // For new users or welcome messages
+        if (!$userLang || $this->isWelcomeRequest($lowerText, $userLang)) {
+            $this->sendMessage($from, $this->messages[$detectedLang]['welcome']);
             return;
         }
         
-        if ($this->isExploreJeddahRequest($lowerText, $userLang)) {
-            $this->sendExploreJeddahMenu($from, $userLang);
-            $this->setUserState($from, 'explore-jeddah');
+        // Validate input length
+        if (strlen($userText) < 2) {
+            $this->sendInputValidationMessage($from, $userLang);
             return;
         }
         
-        // Hotel tour services
-        if ($this->isRestaurantRequest($lowerText, $userLang)) {
-            $this->sendRestaurantInfo($from, $userLang);
-            $this->setUserState($from, 'restaurant');
-            return;
-        }
-        
-        if ($this->isRoomServiceRequest($lowerText, $userLang)) {
-            $this->sendRoomServiceMenu($from, $userLang);
-            $this->setUserState($from, 'room-service');
-            return;
-        }
-        
-        if ($this->isLaundryRequest($lowerText, $userLang)) {
-            $this->sendLaundryInfo($from, $userLang);
-            $this->setUserState($from, 'laundry');
-            return;
-        }
-        
-        if ($this->isGymRequest($lowerText, $userLang)) {
-            $this->sendGymInfo($from, $userLang);
-            $this->setUserState($from, 'gym');
-            return;
-        }
-        
-        if ($this->isReceptionRequest($lowerText, $userLang)) {
-            $this->sendReceptionMenu($from, $userLang);
-            $this->setUserState($from, 'reception');
-            return;
-        }
-        
-        // Reception services
-        if ($this->isWakeUpCallRequest($lowerText, $userLang)) {
-            $this->sendWakeUpCallPrompt($from, $userLang);
-            $this->setUserState($from, 'wake-up-call');
-            return;
-        }
-        
-        if ($this->isVisitorInvitationRequest($lowerText, $userLang)) {
-            $this->sendVisitorInvitationPrompt($from, $userLang);
-            $this->setUserState($from, 'visitor-invitation');
-            return;
-        }
-        
-        // Default: Send welcome message
-        $this->sendWelcomeMessage($from, $userLang);
-        $this->setUserState($from, 'main');
-    }
-
-    // Helper methods for message detection
-    private function isWelcomeMessage($text, $lang)
-    {
-        $welcomeKeywords = [
-            'en' => ['hi', 'hello', 'hey', 'start', 'welcome'],
-            'ar' => ['مرحبا', 'أهلا', 'السلام عليكم', 'مساء الخير', 'صباح الخير']
-        ];
-        
-        foreach ($welcomeKeywords[$lang] ?? $welcomeKeywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isBackCommand($text, $lang)
-    {
-        $backKeywords = [
-            'en' => ['back', 'return', 'previous'],
-            'ar' => ['رجوع', 'عودة', 'السابق']
-        ];
-        
-        foreach ($backKeywords[$lang] ?? $backKeywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isMainMenuCommand($text, $lang)
-    {
-        $mainMenuKeywords = [
-            'en' => ['main menu', 'home', 'start over'],
-            'ar' => ['القائمة الرئيسية', 'الرئيسية', 'البداية']
-        ];
-        
-        foreach ($mainMenuKeywords[$lang] ?? $mainMenuKeywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isHotelTourRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['hotel tour', 'hotel services', 'services', 'facilities'],
-            'ar' => ['جولة الفندق', 'خدمات الفندق', 'المرافق']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isExploreJeddahRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['explore jeddah', 'jeddah tour', 'attractions', 'tourism'],
-            'ar' => ['استكشاف جدة', 'جولة جدة', 'السياحة', 'المعالم']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isRestaurantRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['restaurant', 'dining', 'buffet', 'food'],
-            'ar' => ['مطعم', 'طعام', 'بوفيه', 'غداء', 'عشاء']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isRoomServiceRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['room service', 'order food', 'menu', 'delivery'],
-            'ar' => ['خدمة الغرف', 'طلب طعام', 'قائمة الطعام', 'توصيل']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isLaundryRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['laundry', 'washing', 'cleaning', 'clothes'],
-            'ar' => ['غسيل', 'تنظيف', 'ملابس', 'مغسلة']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isGymRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['gym', 'fitness', 'exercise', 'workout'],
-            'ar' => ['صالة رياضية', 'لياقة', 'تمارين', 'نادي']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isReceptionRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['reception', 'front desk', 'concierge', 'help'],
-            'ar' => ['الاستقبال', 'مكتب الاستقبال', 'مساعدة', 'خدمة العملاء']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isWakeUpCallRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['wake up', 'wake me', 'alarm', 'call me'],
-            'ar' => ['إيقاظ', 'اتصال إيقاظ', 'منبه', 'اتصل بي']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isVisitorInvitationRequest($text, $lang)
-    {
-        $keywords = [
-            'en' => ['visitor', 'guest', 'invite', 'someone coming'],
-            'ar' => ['زائر', 'ضيف', 'دعوة', 'شخص قادم']
-        ];
-        
-        foreach ($keywords[$lang] ?? $keywords['en'] as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Helper methods for sending messages
-    private function sendWelcomeMessage($from, $lang)
-    {
-        $message = [
-            'en' => "Welcome Mr. Ali\nThank You for Visiting Elite Casablanca\nYour wifi password is 183738134\nHave a pleasant stay with us\n\nHow can I help you today?\n\n1️⃣ *Hotel Tour* - Explore our facilities\n2️⃣ *Explore Jeddah* - Discover the city\n\nType *Main Menu* anytime to return here.",
-            'ar' => "مرحباً سيد علي\nشكراً لزيارتكم فندق إليت الدار البيضاء\nكلمة مرور الواي فاي: 183738134\nنتمنى لكم إقامة سعيدة\n\nكيف يمكنني مساعدتك اليوم؟\n\n1️⃣ *جولة الفندق* - استكشف مرافقنا\n2️⃣ *استكشاف جدة* - اكتشف المدينة\n\nاكتب *القائمة الرئيسية* في أي وقت للعودة هنا."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendHotelTourMenu($from, $lang)
-    {
-        $message = [
-            'en' => "*🏨 Hotel Tour - Our Services*\n\n1️⃣ *Restaurant* - Dining & Buffet\n2️⃣ *Room Service* - Order to your room\n3️⃣ *Laundry* - Cleaning services\n4️⃣ *Gym* - Fitness center\n5️⃣ *Reception* - Front desk services\n\nType *Back* to return or *Main Menu* for home.",
-            'ar' => "*🏨 جولة الفندق - خدماتنا*\n\n1️⃣ *المطعم* - الطعام والبوفيه\n2️⃣ *خدمة الغرف* - اطلب إلى غرفتك\n3️⃣ *الغسيل* - خدمات التنظيف\n4️⃣ *الصالة الرياضية* - مركز اللياقة\n5️⃣ *الاستقبال* - خدمات مكتب الاستقبال\n\nاكتب *رجوع* للعودة أو *القائمة الرئيسية* للصفحة الرئيسية."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendExploreJeddahMenu($from, $lang)
-    {
-        $message = [
-            'en' => "*🌃 Explore Jeddah - City Attractions*\n\nDiscover the beauty of Jeddah with our curated experiences:\n\n• *Al-Balad Historic District* - UNESCO World Heritage\n• *King Fahd Fountain* - World's tallest fountain\n• *Jeddah Corniche* - Beautiful waterfront\n• *Red Sea Mall* - Shopping & entertainment\n• *Floating Mosque* - Iconic architecture\n\nPrices range from $40-$150 per person\n\nType *Back* to return or *Main Menu* for home.",
-            'ar' => "*🌃 استكشاف جدة - معالم المدينة*\n\nاكتشف جمال جدة مع تجاربنا المختارة:\n\n• *البلد التاريخية* - تراث اليونسكو العالمي\n• *نافورة الملك فهد* - أطول نافورة في العالم\n• *كورنيش جدة* - الواجهة البحرية الجميلة\n• *ريد سي مول* - التسوق والترفيه\n• *المسجد العائم* - عمارة مميزة\n\nالأسعار تتراوح من 40-150 دولار للشخص\n\nاكتب *رجوع* للعودة أو *القائمة الرئيسية* للصفحة الرئيسية."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    // State management methods
-    private function getUserState($from)
-    {
-        // For now, store in session or cache. In production, use database
-        return session("user_state_$from", 'main');
-    }
-
-    private function setUserState($from, $state)
-    {
-        session(["user_state_$from" => $state]);
-    }
-
-    // Navigation handlers
-    private function handleBackNavigation($from, $userLang, $currentState)
-    {
-        // Handle back navigation based on current state
-        switch ($currentState) {
-            case 'hotel-tour':
-            case 'explore-jeddah':
-                $this->sendWelcomeMessage($from, $userLang);
-                $this->setUserState($from, 'main');
-                break;
-            
-            case 'restaurant':
-            case 'room-service':
-            case 'laundry':
-            case 'gym':
-            case 'reception':
-                $this->sendHotelTourMenu($from, $userLang);
-                $this->setUserState($from, 'hotel-tour');
-                break;
-                
-            case 'wake-up-call':
-            case 'visitor-invitation':
-                $this->sendReceptionMenu($from, $userLang);
-                $this->setUserState($from, 'reception');
-                break;
-                
-            default:
-                $this->sendWelcomeMessage($from, $userLang);
-                $this->setUserState($from, 'main');
-                break;
-        }
-    }
-
-    // Service-specific message senders
-    private function sendRestaurantInfo($from, $lang)
-    {
-        $message = [
-            'en' => "*🍽️ Restaurant - Elite Casablanca*\n\n*Buffet Hours:* 7:00 PM - 10:00 PM\n*Location:* Ground Floor\n*Cuisine:* International & Local\n\n✨ *Tonight's Special Menu:*\n• Fresh Seafood\n• Grilled Specialties\n• Vegetarian Options\n• Dessert Selection\n\n*Dress Code:* Smart Casual\n*Reservations:* Recommended\n\nType *Back* to return or *Main Menu* for home.",
-            'ar' => "*🍽️ المطعم - إليت الدار البيضاء*\n\n*ساعات البوفيه:* 7:00 مساءً - 10:00 مساءً\n*الموقع:* الطابق الأرضي\n*المطبخ:* عالمي ومحلي\n\n✨ *قائمة الليلة الخاصة:*\n• المأكولات البحرية الطازجة\n• المشاوي المتخصصة\n• خيارات نباتية\n• تشكيلة من الحلويات\n\n*قواعد الملبس:* كاجوال أنيق\n*الحجوزات:* مُستحسنة\n\nاكتب *رجوع* للعودة أو *القائمة الرئيسية* للصفحة الرئيسية."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendRoomServiceMenu($from, $lang)
-    {
-        $message = [
-            'en' => "*🍽️ Room Service Menu*\n\n*Available 24/7*\n\n🥗 *Appetizers & Salads*\n• Caesar Salad - $45\n• Mediterranean Mezze - $55\n\n🍖 *Main Courses*\n• Grilled Salmon - $75\n• Chicken Tikka - $65\n• Beef Tenderloin - $85\n• Vegetarian Pasta - $55\n\n🍰 *Desserts*\n• Chocolate Cake - $25\n• Fresh Fruit Platter - $30\n\n☕ *Beverages*\n• Fresh Juice - $15\n• Coffee/Tea - $10\n\n⏰ *Delivery Time:* 30-45 minutes\n💰 *Service Charge:* Included\n\nTo order, call Reception or reply with item name.\n\nType *Back* to return or *Main Menu* for home.",
-            'ar' => "*🍽️ قائمة خدمة الغرف*\n\n*متاحة 24/7*\n\n🥗 *المقبلات والسلطات*\n• سلطة قيصر - 45 دولار\n• مزة متوسطية - 55 دولار\n\n🍖 *الأطباق الرئيسية*\n• سلمون مشوي - 75 دولار\n• دجاج تكا - 65 دولار\n• لحم بقر تندرلوين - 85 دولار\n• باستا نباتية - 55 دولار\n\n🍰 *الحلويات*\n• كيكة الشوكولاتة - 25 دولار\n• طبق فواكه طازجة - 30 دولار\n\n☕ *المشروبات*\n• عصير طازج - 15 دولار\n• قهوة/شاي - 10 دولار\n\n⏰ *وقت التوصيل:* 30-45 دقيقة\n💰 *رسوم الخدمة:* مشمولة\n\nللطلب، اتصل بالاستقبال أو رد باسم الصنف.\n\nاكتب *رجوع* للعودة أو *القائمة الرئيسية* للصفحة الرئيسية."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendLaundryInfo($from, $lang)
-    {
-        $message = [
-            'en' => "*🧺 Laundry Service*\n\n*Service Hours:* 8:00 AM - 8:00 PM\n*Price:* $25 per load\n\n📋 *Services Available:*\n• Washing & Drying\n• Dry Cleaning\n• Ironing\n• Same-day service available\n\n⏰ *Turnaround Time:*\n• Standard: 24 hours\n• Express: 6 hours (+$10)\n\n📞 *How to Order:*\nCall Reception or place items in laundry bag provided in your room.\n\n*Pickup:* 9:00 AM & 6:00 PM daily\n*Delivery:* Next day by 7:00 PM\n\nType *Back* to return or *Main Menu* for home.",
-            'ar' => "*🧺 خدمة الغسيل*\n\n*ساعات الخدمة:* 8:00 صباحاً - 8:00 مساءً\n*السعر:* 25 دولار للحمولة الواحدة\n\n📋 *الخدمات المتاحة:*\n• الغسيل والتجفيف\n• التنظيف الجاف\n• الكوي\n• خدمة نفس اليوم متاحة\n\n⏰ *وقت التسليم:*\n• عادي: 24 ساعة\n• سريع: 6 ساعات (+10 دولار)\n\n📞 *كيفية الطلب:*\nاتصل بالاستقبال أو ضع الملابس في كيس الغسيل المتوفر في غرفتك.\n\n*الاستلام:* 9:00 صباحاً و 6:00 مساءً يومياً\n*التسليم:* اليوم التالي بحلول 7:00 مساءً\n\nاكتب *رجوع* للعودة أو *القائمة الرئيسية* للصفحة الرئيسية."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendGymInfo($from, $lang)
-    {
-        $message = [
-            'en' => "*💪 Fitness Center*\n\n*Hours:* 5:00 AM - 11:00 PM daily\n*Location:* 2nd Floor\n*Access:* Free for all guests\n\n🏋️ *Equipment Available:*\n• Cardio machines (treadmills, bikes)\n• Weight training equipment\n• Free weights\n• Yoga mats\n• Towel service\n\n🏊 *Additional Facilities:*\n• Swimming pool access\n• Sauna (6:00 AM - 10:00 PM)\n• Changing rooms with lockers\n\n📋 *Rules:*\n• Proper gym attire required\n• Maximum 90 minutes per session\n• No food or drinks (water allowed)\n\n*Personal Trainer:* Available upon request ($50/hour)\n\nType *Back* to return or *Main Menu* for home.",
-            'ar' => "*💪 مركز اللياقة البدنية*\n\n*الساعات:* 5:00 صباحاً - 11:00 مساءً يومياً\n*الموقع:* الطابق الثاني\n*الدخول:* مجاني لجميع النزلاء\n\n🏋️ *المعدات المتاحة:*\n• آلات الكارديو (مشايات، دراجات)\n• معدات تدريب الأوزان\n• أوزان حرة\n• حصائر يوغا\n• خدمة المناشف\n\n🏊 *مرافق إضافية:*\n• دخول إلى المسبح\n• ساونا (6:00 صباحاً - 10:00 مساءً)\n• غرف تغيير الملابس مع خزائن\n\n📋 *القواعد:*\n• ملابس رياضية مناسبة مطلوبة\n• حد أقصى 90 دقيقة لكل جلسة\n• ممنوع الطعام أو المشروبات (الماء مسموح)\n\n*مدرب شخصي:* متاح عند الطلب (50 دولار/ساعة)\n\nاكتب *رجوع* للعودة أو *القائمة الرئيسية* للصفحة الرئيسية."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendReceptionMenu($from, $lang)
-    {
-        $message = [
-            'en' => "*📞 Reception Services*\n\n*Available 24/7*\n\n🛎️ *Our Services:*\n1️⃣ *Wake-up Call* - Set your morning call\n2️⃣ *Visitor Invitation* - Register a guest\n3️⃣ *General Assistance* - Any other help\n\n📋 *Additional Services:*\n• Taxi/Transportation booking\n• Restaurant reservations\n• Tour arrangements\n• Lost & Found\n• Room maintenance requests\n\n📞 *Direct Line:* Available in your room\n📱 *WhatsApp:* You're already here!\n\nSelect a service above or type *Back* to return to Hotel Tour.\n\nType *Main Menu* anytime to start over.",
-            'ar' => "*📞 خدمات الاستقبال*\n\n*متاحة 24/7*\n\n🛎️ *خدماتنا:*\n1️⃣ *اتصال الإيقاظ* - حدد مكالمة الصباح\n2️⃣ *دعوة زائر* - سجل ضيف\n3️⃣ *مساعدة عامة* - أي مساعدة أخرى\n\n📋 *خدمات إضافية:*\n• حجز تاكسي/مواصلات\n• حجز مطاعم\n• ترتيب الجولات\n• المفقودات والمعثورات\n• طلبات صيانة الغرف\n\n📞 *الخط المباشر:* متاح في غرفتك\n📱 *واتساب:* أنت هنا بالفعل!\n\nاختر خدمة أعلاه أو اكتب *رجوع* للعودة إلى جولة الفندق.\n\nاكتب *القائمة الرئيسية* في أي وقت للبدء من جديد."
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendWakeUpCallPrompt($from, $lang)
-    {
-        $message = [
-            'en' => "*⏰ Wake-up Call Service*\n\nI'll help you set up a wake-up call!\n\n📝 *Please tell me:*\nWhen would you like to be woken up?\n\n💡 *Examples:*\n• \"Tomorrow at 7 AM\"\n• \"In 8 hours\"\n• \"6:30 in the morning\"\n• \"After 3 hours\"\n\n⏰ Your wake-up call will be delivered via WhatsApp and phone call.\n\nType your preferred time now:",
-            'ar' => "*⏰ خدمة اتصال الإيقاظ*\n\nسأساعدك في إعداد مكالمة إيقاظ!\n\n📝 *يرجى إخباري:*\nمتى تريد أن يتم إيقاظك؟\n\n💡 *أمثلة:*\n• \"غداً في الساعة 7 صباحاً\"\n• \"بعد 8 ساعات\"\n• \"6:30 صباحاً\"\n• \"بعد 3 ساعات\"\n\n⏰ سيتم تسليم مكالمة الإيقاظ عبر واتساب ومكالمة هاتفية.\n\nاكتب الوقت المفضل الآن:"
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    private function sendVisitorInvitationPrompt($from, $lang)
-    {
-        $message = [
-            'en' => "*👥 Visitor Invitation*\n\nI'll help you register a visitor!\n\n📝 *Please provide:*\nThe full name of your visitor\n\n💡 *Example:*\n• \"Ahmed Mohammed\"\n• \"Sarah Johnson\"\n• \"Dr. Ali Hassan\"\n\n🛂 *What happens next:*\n• Your visitor will be added to our guest list\n• Reception will be notified\n• They can mention your room number at the front desk\n\n📝 Please type the visitor's full name:",
-            'ar' => "*👥 دعوة زائر*\n\nسأساعدك في تسجيل زائر!\n\n📝 *يرجى تقديم:*\nالاسم الكامل لزائرك\n\n💡 *مثال:*\n• \"أحمد محمد\"\n• \"سارة جونسون\"\n• \"د. علي حسن\"\n\n🛂 *ما سيحدث بعد ذلك:*\n• سيتم إضافة زائرك إلى قائمة الضيوف\n• سيتم إخطار الاستقبال\n• يمكنهم ذكر رقم غرفتك في مكتب الاستقبال\n\n📝 يرجى كتابة الاسم الكامل للزائر:"
-        ];
-        
-        $this->sendMessage($from, $message[$lang] ?? $message['en']);
-    }
-
-    // Input handlers for specific states
-    private function handleWakeUpTimeInput($from, $userText, $userLang)
-    {
-        // Parse the wake-up time input
-        $timeInput = trim($userText);
-        
-        // Simple time parsing - in a real app, you'd use more sophisticated parsing
-        $successMessage = [
-            'en' => "✅ *Wake-up Call Scheduled!*\n\n⏰ *Your Request:* $timeInput\n\n📞 You will receive:\n• WhatsApp message\n• Phone call to your room\n\n✨ *Confirmation:* Your wake-up call has been registered with reception.\n\n*Need to change it?* Just send another wake-up request.\n\nType *Reception* for more services or *Main Menu* to start over.",
-            'ar' => "✅ *تم جدولة اتصال الإيقاظ!*\n\n⏰ *طلبك:* $timeInput\n\n📞 ستتلقى:\n• رسالة واتساب\n• مكالمة هاتفية إلى غرفتك\n\n✨ *التأكيد:* تم تسجيل مكالمة الإيقاظ في الاستقبال.\n\n*تريد تغييرها؟* فقط أرسل طلب إيقاظ آخر.\n\nاكتب *الاستقبال* لمزيد من الخدمات أو *القائمة الرئيسية* للبدء من جديد."
-        ];
-        
-        $this->sendMessage($from, $successMessage[$userLang] ?? $successMessage['en']);
-        $this->setUserState($from, 'reception'); // Return to reception menu state
-    }
-
-    private function handleVisitorNameInput($from, $userText, $userLang)
-    {
-        // Process the visitor name
-        $visitorName = trim($userText);
-        
-        if (strlen($visitorName) < 2) {
-            $errorMessage = [
-                'en' => "❌ Please provide a valid visitor name (at least 2 characters).\n\nTry again:",
-                'ar' => "❌ يرجى تقديم اسم زائر صحيح (حرفان على الأقل).\n\nحاول مرة أخرى:"
-            ];
-            $this->sendMessage($from, $errorMessage[$userLang] ?? $errorMessage['en']);
-            return;
-        }
-        
-        $successMessage = [
-            'en' => "✅ *Visitor Registered Successfully!*\n\n👤 *Visitor Name:* $visitorName\n🏨 *Your Room:* [Room will be auto-detected]\n\n📋 *What's Done:*\n• Added to guest list\n• Reception notified\n• 24-hour access granted\n\n🛂 *Instructions for your visitor:*\n1. Present ID at front desk\n2. Mention your name and room number\n3. They'll be directed to your room\n\n*Need to register another visitor?* Just send their name.\n\nType *Reception* for more services or *Main Menu* to start over.",
-            'ar' => "✅ *تم تسجيل الزائر بنجاح!*\n\n👤 *اسم الزائر:* $visitorName\n🏨 *غرفتك:* [سيتم اكتشاف الغرفة تلقائياً]\n\n📋 *ما تم عمله:*\n• الإضافة إلى قائمة الضيوف\n• إخطار الاستقبال\n• منح دخول لمدة 24 ساعة\n\n🛂 *تعليمات لزائرك:*\n1. تقديم الهوية في مكتب الاستقبال\n2. ذكر اسمك ورقم غرفتك\n3. سيتم توجيههم إلى غرفتك\n\n*تريد تسجيل زائر آخر؟* فقط أرسل اسمه.\n\nاكتب *الاستقبال* لمزيد من الخدمات أو *القائمة الرئيسية* للبدء من جديد."
-        ];
-        
-        $this->sendMessage($from, $successMessage[$userLang] ?? $successMessage['en']);
-        $this->setUserState($from, 'reception'); // Return to reception menu state
+        // Search for services
+        $this->searchAndSendServices($from, $userText, $userLang);
     }
 
     /**

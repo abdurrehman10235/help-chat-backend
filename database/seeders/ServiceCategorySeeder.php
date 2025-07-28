@@ -9,11 +9,12 @@ class ServiceCategorySeeder extends Seeder
 {
     public function run()
     {
-        DB::table('service_categories')->insertOrIgnore([
-            ['slug' => 'pre-arrival', 'name_en' => 'Pre-Arrival', 'name_ar' => 'قبل الوصول'],
-            ['slug' => 'arrival', 'name_en' => 'Arrival', 'name_ar' => 'الوصول'],
-            ['slug' => 'in-stay', 'name_en' => 'In-Stay', 'name_ar' => 'أثناء الإقامة'],
-            ['slug' => 'departure', 'name_en' => 'Departure', 'name_ar' => 'المغادرة'],
+        // Clear existing data
+        DB::table('service_categories')->truncate();
+        
+        DB::table('service_categories')->insert([
+            ['slug' => 'hotel-tour', 'name_en' => 'Hotel Tour', 'name_ar' => 'جولة في الفندق'],
+            ['slug' => 'explore-jeddah', 'name_en' => 'Explore Jeddah', 'name_ar' => 'استكشف جدة'],
         ]);
     }
 }

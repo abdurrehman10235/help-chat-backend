@@ -9,112 +9,155 @@ class ServiceArSeeder extends Seeder
 {
     public function run()
     {
-        // Get category IDs by slug
+        // Clear existing data
+        DB::table('services_ar')->truncate();
+        
+        // Get category IDs from the service_categories table
         $categories = DB::table('service_categories')->pluck('id', 'slug');
 
         DB::table('services_ar')->insert([
-            // Pre-arrival
+            // Hotel Tour Services
             [
-                'slug' => 'airport-pickup',
-                'name' => 'استقبال من المطار',
-                'description' => 'خدمة نقل خاصة من المطار قبل إقامتك.',
-                'price' => 120.00,
-                'image_url' => '/services/airport_pickup.jpg',
-                'category_id' => $categories['pre-arrival'],
-            ],
-            [
-                'slug' => 'early-checkin',
-                'name' => 'تسجيل وصول مبكر',
-                'description' => 'الوصول المبكر قبل الوقت الرسمي لتسجيل الوصول.',
-                'price' => 40.00,
-                'image_url' => '/services/early_checkin.jpg',
-                'category_id' => $categories['pre-arrival'],
-            ],
-            [
-                'slug' => 'room-preferences',
-                'name' => 'تفضيلات الغرفة',
-                'description' => 'خصص تفضيلات غرفتك قبل الوصول.',
+                'slug' => 'restaurant',
+                'name' => 'المطعم',
+                'description' => 'بوفيه مفتوح - التوقيت: 07:00 مساءً - 10:00 مساءً',
                 'price' => 0.00,
-                'image_url' => '/services/room_preferences.jpg',
-                'category_id' => $categories['pre-arrival'],
+                'image_url' => '/services/restaurant.jpg',
+                'category_id' => $categories['hotel-tour'],
             ],
-
-            // Arrival
-            [
-                'slug' => 'welcome-drink',
-                'name' => 'مشروب ترحيبي',
-                'description' => 'استمتع بمشروب منعش عند الوصول.',
-                'price' => 10.00,
-                'image_url' => '/services/welcome_drink.jpg',
-                'category_id' => $categories['arrival'],
-            ],
-            [
-                'slug' => 'luggage-assistance',
-                'name' => 'مساعدة في الأمتعة',
-                'description' => 'خدمة حمل الحقائب عند الوصول.',
-                'price' => 0.00,
-                'image_url' => '/services/luggage_assistance.jpg',
-                'category_id' => $categories['arrival'],
-            ],
-            [
-                'slug' => 'express-checkin',
-                'name' => 'تسجيل دخول سريع',
-                'description' => 'تسجيل دخول سريع بدون انتظار.',
-                'price' => 15.00,
-                'image_url' => '/services/express_checkin.jpg',
-                'category_id' => $categories['arrival'],
-            ],
-
-            // In-stay
             [
                 'slug' => 'room-service',
                 'name' => 'خدمة الغرف',
-                'description' => 'خدمة طعام مريحة داخل الغرفة متوفرة 24/7.',
-                'price' => 50.00,
-                'image_url' => '/services/686bbad7c852f.jpg',
-                'category_id' => $categories['in-stay'],
+                'description' => 'اطلب وجبات شهية إلى غرفتك',
+                'price' => 0.00,
+                'image_url' => '/services/room_service.jpg',
+                'category_id' => $categories['hotel-tour'],
             ],
             [
                 'slug' => 'laundry',
-                'name' => 'غسيل الملابس',
-                'description' => 'خدمة غسيل وتنظيف جاف احترافية.',
+                'name' => 'المغسلة',
+                'description' => 'خدمة غسيل احترافية - التوقيت: 07:00 صباحاً - 10:00 مساءً',
                 'price' => 25.00,
-                'image_url' => '/services/686bbbcb81790.jpg',
-                'category_id' => $categories['in-stay'],
+                'image_url' => '/services/laundry.jpg',
+                'category_id' => $categories['hotel-tour'],
             ],
             [
-                'slug' => 'spa',
-                'name' => 'سبا',
-                'description' => 'استرخِ مع علاجات السبا الفاخرة.',
-                'price' => 90.00,
-                'image_url' => '/services/spa.jpg',
-                'category_id' => $categories['in-stay'],
+                'slug' => 'gym',
+                'name' => 'النادي الرياضي',
+                'description' => 'مركز لياقة بدنية متطور - التوقيت: 05:00 صباحاً - 11:00 مساءً',
+                'price' => 0.00,
+                'image_url' => '/services/gym.jpg',
+                'category_id' => $categories['hotel-tour'],
+            ],
+            [
+                'slug' => 'reception',
+                'name' => 'الاستقبال',
+                'description' => 'خدمات ومساعدة الاستقبال',
+                'price' => 0.00,
+                'image_url' => '/services/reception.jpg',
+                'category_id' => $categories['hotel-tour'],
             ],
 
-            // Departure
+            // Reception Sub-services
             [
-                'slug' => 'late-checkout',
-                'name' => 'تسجيل خروج متأخر',
-                'description' => 'تمديد إقامتك بعد الوقت المحدد للخروج.',
-                'price' => 35.00,
-                'image_url' => '/services/late_checkout.jpg',
-                'category_id' => $categories['departure'],
-            ],
-            [
-                'slug' => 'baggage-hold',
-                'name' => 'حفظ الأمتعة',
-                'description' => 'نحفظ حقائبك بعد الخروج حتى موعد مغادرتك.',
+                'slug' => 'wake-up-call',
+                'name' => 'خدمة الإيقاظ',
+                'description' => 'مكالمة إيقاظ شخصية في الوقت المفضل لديك',
                 'price' => 0.00,
-                'image_url' => '/services/baggage_hold.jpg',
-                'category_id' => $categories['departure'],
+                'image_url' => '/services/wake_up.jpg',
+                'category_id' => $categories['hotel-tour'],
             ],
             [
-                'slug' => 'airport-dropoff',
-                'name' => 'توصيل إلى المطار',
-                'description' => 'نقل مريح إلى المطار بعد انتهاء إقامتك.',
-                'price' => 120.00,
-                'image_url' => '/services/airport_dropoff.jpg',
-                'category_id' => $categories['departure'],
+                'slug' => 'visitor-invitation',
+                'name' => 'دعوة زائر',
+                'description' => 'تسجيل معلومات الزائر لإرشاد الاستقبال',
+                'price' => 0.00,
+                'image_url' => '/services/visitor.jpg',
+                'category_id' => $categories['hotel-tour'],
+            ],
+
+            // Room Service Menu Items
+            [
+                'slug' => 'club-sandwich',
+                'name' => 'ساندويش كلوب',
+                'description' => 'ساندويش ثلاثي الطبقات بالدجاج والبيكون والخس والطماطم',
+                'price' => 45.00,
+                'image_url' => '/services/club_sandwich.jpg',
+                'category_id' => $categories['hotel-tour'],
+            ],
+            [
+                'slug' => 'pasta-alfredo',
+                'name' => 'باستا ألفريدو',
+                'description' => 'فيتوتشيني ألفريدو كريمي مع الدجاج المشوي',
+                'price' => 55.00,
+                'image_url' => '/services/pasta_alfredo.jpg',
+                'category_id' => $categories['hotel-tour'],
+            ],
+            [
+                'slug' => 'grilled-salmon',
+                'name' => 'سلمون مشوي',
+                'description' => 'سلمون أطلسي طازج مع زبدة الليمون والأعشاب',
+                'price' => 85.00,
+                'image_url' => '/services/grilled_salmon.jpg',
+                'category_id' => $categories['hotel-tour'],
+            ],
+            [
+                'slug' => 'caesar-salad',
+                'name' => 'سلطة سيزر',
+                'description' => 'خس رومين مقرمش مع البارميزان والخبز المحمص',
+                'price' => 35.00,
+                'image_url' => '/services/caesar_salad.jpg',
+                'category_id' => $categories['hotel-tour'],
+            ],
+            [
+                'slug' => 'chocolate-cake',
+                'name' => 'كيك الشوكولاتة',
+                'description' => 'كيك شوكولاتة غني بطبقات مع آيس كريم الفانيليا',
+                'price' => 25.00,
+                'image_url' => '/services/chocolate_cake.jpg',
+                'category_id' => $categories['hotel-tour'],
+            ],
+
+            // Explore Jeddah Services
+            [
+                'slug' => 'jeddah-resorts',
+                'name' => 'منتجعات جدة',
+                'description' => 'اكتشف منتجعات الشاطئ الجميلة حول جدة',
+                'price' => 150.00,
+                'image_url' => '/services/jeddah_resorts.jpg',
+                'category_id' => $categories['explore-jeddah'],
+            ],
+            [
+                'slug' => 'balad-site',
+                'name' => 'موقع البلد التاريخي',
+                'description' => 'موقع التراث العالمي لليونسكو - جدة التاريخية',
+                'price' => 80.00,
+                'image_url' => '/services/balad_site.jpg',
+                'category_id' => $categories['explore-jeddah'],
+            ],
+            [
+                'slug' => 'corniche-site',
+                'name' => 'كورنيش جدة',
+                'description' => 'منطقة الواجهة البحرية الجميلة مع إطلالات خلابة على البحر الأحمر',
+                'price' => 60.00,
+                'image_url' => '/services/corniche_site.jpg',
+                'category_id' => $categories['explore-jeddah'],
+            ],
+            [
+                'slug' => 'shopping-mall',
+                'name' => 'مراكز التسوق',
+                'description' => 'وجهات التسوق الفاخرة في جدة',
+                'price' => 100.00,
+                'image_url' => '/services/shopping_mall.jpg',
+                'category_id' => $categories['explore-jeddah'],
+            ],
+            [
+                'slug' => 'king-fahd-fountain',
+                'name' => 'نافورة الملك فهد',
+                'description' => 'أطول نافورة مياه في العالم',
+                'price' => 40.00,
+                'image_url' => '/services/king_fahd_fountain.jpg',
+                'category_id' => $categories['explore-jeddah'],
             ],
         ]);
     }
